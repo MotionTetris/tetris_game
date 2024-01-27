@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Engine,
   Render,
@@ -9,10 +9,13 @@ import {
   Events,
   Composite,
   Vertices,
-  IChamferableBodyDefinition
+  IChamferableBodyDefinition,
 } from "matter-js";
-import * as posenet from "@tensorflow-models/posenet";
 import "@tensorflow/tfjs";
+import * as posenet from "@tensorflow-models/posenet";
+import * as Cutter from "martinez-polygon-clipping";
+import * as PIXI from "pixi.js";
+
 import {
   blockSize,
   createOBlock,
@@ -24,8 +27,9 @@ import {
   createZBlock,
 } from "./createblock.tsx";
 import BlockInfo from "./blockinfo.tsx";
-import * as Cutter from 'martinez-polygon-clipping';
+import { booleanMaskAsync } from "@tensorflow/tfjs";
 
+import { UnionFind, createBody, verticesToGeometry, geoJsonToVectors, shouldCombine} from "./calcultate.tsx";
 // 블록 생성 함수 배열
 const blockCreators: Array<(x: number, y: number) => Body> = [
   createIBlock,
@@ -48,13 +52,14 @@ function createRandomBlock(x: number, randomIndex: number) {
   return createBlock(x, 0); // 화면의 중앙 상단에서 블록 생성
 }
 
-
-
-
-const line = [[[100,490], [500, 490], [100, 550], [500, 550]]];
-
-
-
+const line = [
+  [
+    [100, 490],
+    [500, 490],
+    [100, 550],
+    [500, 550],
+  ],
+];
 
 let nextBlockIndex: number = getRandomIndex(7);
 let playerScore = 0;
@@ -79,203 +84,93 @@ const Tetris: React.FC = () => {
       y: 0.13,
     },
   });
-  
 
+  function removeLines(body: any) {
+    World.remove(engine.world, body);
+    const bodyToAdd: any[] = [];
+    console.log(body);
+    for (let i = 1; i < body.parts.length; i++) {
+      const part = body.parts[i];
+      const poly = verticesToGeometry(part);
+      const cut = Cutter.diff(poly, line);
+      const cut1 = cut[0];
+      const cut2 = cut[1];
 
-  class UnionFind {
-    count: number;
-    parent: number[];
-  
-    constructor(elements: number[]) {
-      this.count = elements.length;
-      this.parent = [];
-      for (let i = 0; i < this.count; i++) {
-        this.parent[i] = i;
+      if (cut1) {
+        bodyToAdd.push(createBody(cut1, body.parts[i].render.fillStyle));
+      }
+
+      if (cut2) {
+        bodyToAdd.push(createBody(cut2, body.parts[i].render.fillStyle));
       }
     }
-  
-    union(a: number, b: number): void {
-      let rootA = this.find(a);
-      let rootB = this.find(b);
-  
-      if (rootA === rootB) return;
-  
-      if (rootA < rootB) {
-        if (this.parent[b] !== b) this.union(this.parent[b], a);
-        this.parent[b] = this.parent[a];
-      } else {
-        if (this.parent[a] !== a) this.union(this.parent[a], b);
-        this.parent[a] = this.parent[b];
-      }
-    }
-  
-    find(a: number): number {
-      while (this.parent[a] !== a) {
-        a = this.parent[a];
-      }
-      return a;
-    }
-  
-    connected(a: number, b: number): boolean {
-      return this.find(a) === this.find(b);
-    }
-  }
-  
-  function mapToVector(coord: any) {
-    if (coord.length !== 2) {
-        console.error("invalid coordinates");
-        return;
-    }
-  
-    return {x: coord[0], y: coord[1]};
-  }
-  
-  function geoJsonToVectors(geometry: any) {
-    if (!geometry) {
-        console.error("geometry is null or undefined");
-        return;
-    }
-  
-    if (geometry.length !== 1) {
-        console.error("invalid geometry");
-        return;
-    }
-  
-    const polygon = geometry[0].slice();
-    polygon.pop();
-    const result = polygon.map(mapToVector);
-    return result;
-  }
-  
-  
-  function createBody(geometry: any, style: string) {
-    const points = geoJsonToVectors(geometry);
-    return Bodies.fromVertices(Vertices.centre(points).x, Vertices.centre(points).y, points, {
-      render: {fillStyle: style}
-    });
-  }
-  
-  function verticesToGeometry(body: any) {
-    let vertices = Vertices.clockwiseSort(body.vertices.slice());
-    vertices.push(vertices[0]);
-    return [vertices.map(vertexToArray)];
-  }
-  
-  function vertexToArray(vertex: any) {
-    return [vertex.x, vertex.y];
-  }
-  
-  function calculateDistance(point1: any, point2: any) {
-    let dx = point1.x - point2.x;
-    let dy = point1.y - point2.y;
-    return Math.sqrt(dx * dx + dy * dy);
-  }
-  
-  function shouldCombine(body1: any[], body2: any[], maxDistance: number) {
-    for (let i = 0; i < body1.length; i++) {
-      for (let j = 0; j < body2.length; j++) {
-        let distance = calculateDistance(body1[i], body2[j]);
-        if (distance <= maxDistance) {
-          return true;
+
+    let unionFind = new UnionFind(bodyToAdd);
+    for (let i = 0; i < bodyToAdd.length; i++) {
+      for (let j = i + 1; j < bodyToAdd.length; j++) {
+        let result = shouldCombine(
+          bodyToAdd[i].vertices,
+          bodyToAdd[j].vertices,
+          1
+        );
+        if (result) {
+          unionFind.union(i, j);
         }
       }
     }
-    return false;
-  }
-  
-  
-  function removeLines(body: any) {
-      World.remove(engine.world, body);
-      const bodyToAdd: any[] = [];
-      console.log(body);
-      for (let i = 1; i < body.parts.length; i++) {
-          const part = body.parts[i];
-          const poly = verticesToGeometry(part);
-          const cut = Cutter.diff(poly, line);
-          const cut1 = cut[0];
-          const cut2 = cut[1];
-  
-          if (cut1) {
-              bodyToAdd.push(createBody(cut1, body.parts[i].render.fillStyle));
-          }
-  
-          if (cut2) {
-              bodyToAdd.push(createBody(cut2, body.parts[i].render.fillStyle));
-          }
-      }
-  
-      let unionFind = new UnionFind(bodyToAdd);
-      for (let i = 0; i < bodyToAdd.length; i++) {
-          for (let j = i + 1; j < bodyToAdd.length; j++) {
-              let result = shouldCombine(bodyToAdd[i].vertices, bodyToAdd[j].vertices, 1);
-              if (result) {
-                  unionFind.union(i, j);
-              }
-          }
-      }
-  
-      const group = new Map<number, any[]>();
-      for (let i = 0; i < bodyToAdd.length; i++) {
-          let root = unionFind.find(i);
-          if (group.get(root)) {
-              group.get(root)?.push(bodyToAdd[i]);
-          } else {
-              group.set(root, []);
-              group.get(root)?.push(bodyToAdd[i]);
-          }
-      }
-      const realBodyToAdd: any[] = [];
-      
-      group.forEach((value) => {
-        console.log("val", value);
-        let add = Body.create({
-            parts: value
-        } as IChamferableBodyDefinition);
-        console.log("added:", add.id, value);
-        realBodyToAdd.push(add);
-      })
 
-  
-      World.add(engine.world, realBodyToAdd);
-  }
-  
+    const group = new Map<number, any[]>();
+    for (let i = 0; i < bodyToAdd.length; i++) {
+      let root = unionFind.find(i);
+      if (group.get(root)) {
+        group.get(root)?.push(bodyToAdd[i]);
+      } else {
+        group.set(root, []);
+        group.get(root)?.push(bodyToAdd[i]);
+      }
+    }
+    const realBodyToAdd: any[] = [];
 
+    group.forEach((value) => {
+      console.log("val", value);
+      let add = Body.create({
+        parts: value,
+      } as IChamferableBodyDefinition);
+      console.log("added:", add.id, value);
+      realBodyToAdd.push(add);
+    });
+
+    World.add(engine.world, realBodyToAdd);
+  }
 
   function calculateArea(vertices: any) {
     const n = vertices.length;
     let area = 0;
 
     for (let i = 0; i < n; i++) {
-        const current = vertices[i];
-        const next = vertices[(i + 1) % n];
-        area += (current.x * next.y) - (next.x * current.y);
+      const current = vertices[i];
+      const next = vertices[(i + 1) % n];
+      area += current.x * next.y - next.x * current.y;
     }
 
     area = Math.abs(area) / 2;
     return area;
-}
+  }
 
-function calculateLineArea(body: any) {
+  function calculateLineArea(body: any) {
     let sum = 0;
     for (let i = 1; i < body.parts.length; i++) {
-        const part = body.parts[i];
-        const poly = verticesToGeometry(part);
-        const cut = Cutter.intersection(poly, line);
-        if (!cut) {
-            continue;
-        }
-        sum += calculateArea(geoJsonToVectors(cut[0]));
+      const part = body.parts[i];
+      const poly = verticesToGeometry(part);
+      const cut = Cutter.intersection(poly, line);
+      if (!cut) {
+        continue;
+      }
+      sum += calculateArea(geoJsonToVectors(cut[0]));
     }
     playerScore += sum;
     return sum;
-}
-
-
-
-
-  
-  
-
+  }
 
   useEffect(() => {
     async function setupWebcam() {
@@ -461,63 +356,63 @@ function calculateLineArea(body: any) {
             rightAngleDelta = rightAngleInDegrees - prevRightAngle;
           }
 
-          if (leftAngleDelta > rightAngleDelta) {
-            if (
-              leftAngleDelta > 35 &&
-              leftAngleInDegrees > prevLeftAngle &&
-              leftWristX < prevLeftWristX-20
-            ) {
-              const block = blockRef.current;
-              if (block) {
-                // block이 존재하는지 확인
-                Body.rotate(block, -Math.PI / 4); // 45도 회전
-                setMessage("왼쪽으로 회전!"); // 메시지를 변경합니다.
-                setTimeout(() => setMessage(""), 500);
-              }
-            }
-          } else {
-            if (
-              rightAngleDelta > 35 &&
-              rightAngleInDegrees > prevRightAngle &&
-              rightWristX-20 > prevRightWristX
-            ) {
-              const block = blockRef.current;
-              if (block) {
-                // block이 존재하는지 확인
-                Body.rotate(block, Math.PI / 4); // 45도 회전
-                setMessage("오른쪽으로 회전!");
-                setTimeout(() => setMessage(""), 500);
-              }
-            }
-          }
+          // if (leftAngleDelta > rightAngleDelta) {
+          //   if (
+          //     leftAngleDelta > 35 &&
+          //     leftAngleInDegrees > prevLeftAngle &&
+          //     leftWristX < prevLeftWristX-20
+          //   ) {
+          //     const block = blockRef.current;
+          //     if (block) {
+          //       // block이 존재하는지 확인
+          //       Body.rotate(block, -Math.PI / 4); // 45도 회전
+          //       setMessage("왼쪽으로 회전!"); // 메시지를 변경합니다.
+          //       setTimeout(() => setMessage(""), 500);
+          //     }
+          //   }
+          // } else {
+          //   if (
+          //     rightAngleDelta > 35 &&
+          //     rightAngleInDegrees > prevRightAngle &&
+          //     rightWristX-20 > prevRightWristX
+          //   ) {
+          //     const block = blockRef.current;
+          //     if (block) {
+          //       // block이 존재하는지 확인
+          //       Body.rotate(block, Math.PI / 4); // 45도 회전
+          //       setMessage("오른쪽으로 회전!");
+          //       setTimeout(() => setMessage(""), 500);
+          //     }
+          //   }
+          // }
 
-          let noseKeypoint = pose.keypoints.find(
-            (keypoint) => keypoint.part === "nose"
-          );
+          // let noseKeypoint = pose.keypoints.find(
+          //   (keypoint) => keypoint.part === "nose"
+          // );
 
-          // 각 요소가 존재하는지 확인하고, 존재한다면 위치 정보를 가져옵니다.
-          let noseX = noseKeypoint
-            ? noseKeypoint.position.x
-            : null;
+          // // 각 요소가 존재하는지 확인하고, 존재한다면 위치 정보를 가져옵니다.
+          // let noseX = noseKeypoint
+          //   ? noseKeypoint.position.x
+          //   : null;
 
-          let centerX = videoRef.current ? videoRef.current.offsetWidth / 2 : null;
+          // let centerX = videoRef.current ? videoRef.current.offsetWidth / 2 : null;
 
-          if (noseX && centerX) {
-            let forceMagnitude = Math.abs(noseX - centerX) / (centerX*100); // 중앙에서 얼마나 떨어져 있는지에 비례하는 힘의 크기를 계산합니다.
-            forceMagnitude = Math.min(forceMagnitude, 1); // 힘의 크기가 너무 커지지 않도록 1로 제한합니다.
+          // if (noseX && centerX) {
+          //   let forceMagnitude = Math.abs(noseX - centerX) / (centerX*100); // 중앙에서 얼마나 떨어져 있는지에 비례하는 힘의 크기를 계산합니다.
+          //   forceMagnitude = Math.min(forceMagnitude, 1); // 힘의 크기가 너무 커지지 않도록 1로 제한합니다.
 
-            let block = blockRef.current; // 현재 블록에 대한 참조를 얻습니다.
+          //   let block = blockRef.current; // 현재 블록에 대한 참조를 얻습니다.
 
-            if (block) {
-              if (noseX < centerX) {
-                // 코의 x 좌표가 캔버스 중앙보다 왼쪽에 있다면, 블록에 왼쪽으로 힘을 가합니다.
-                Body.applyForce(block, block.position, { x: -forceMagnitude, y: 0 });
-              } else {
-                // 코의 x 좌표가 캔버스 중앙보다 오른쪽에 있다면, 블록에 오른쪽으로 힘을 가합니다.
-                Body.applyForce(block, block.position, { x: forceMagnitude, y: 0 });
-              }
-            }
-          }
+          //   if (block) {
+          //     if (noseX < centerX) {
+          //       // 코의 x 좌표가 캔버스 중앙보다 왼쪽에 있다면, 블록에 왼쪽으로 힘을 가합니다.
+          //       Body.applyForce(block, block.position, { x: -forceMagnitude, y: 0 });
+          //     } else {
+          //       // 코의 x 좌표가 캔버스 중앙보다 오른쪽에 있다면, 블록에 오른쪽으로 힘을 가합니다.
+          //       Body.applyForce(block, block.position, { x: forceMagnitude, y: 0 });
+          //     }
+          //   }
+          // }
 
           prevLeftAngle = leftAngleInDegrees;
           prevRightAngle = rightAngleInDegrees;
@@ -542,6 +437,7 @@ function calculateLineArea(body: any) {
       },
     });
 
+
     // 렌더러 시작
     Render.run(render);
 
@@ -551,16 +447,16 @@ function calculateLineArea(body: any) {
 
     // 바닥 생성
     const ground = Bodies.rectangle(300, 700, 610, 60, {
-       isStatic: true,
-       label: 'Wall'
-       });
+      isStatic: true,
+      label: "Wall",
+    });
     World.add(engine.world, ground);
 
     // 왼쪽 벽 생성
     const leftWall = Bodies.rectangle(100, 370, 60, 700, {
       isStatic: true,
       friction: 0,
-      label: 'Wall'
+      label: "Wall",
     });
     World.add(engine.world, leftWall);
 
@@ -568,7 +464,7 @@ function calculateLineArea(body: any) {
     const rightWall = Bodies.rectangle(500, 370, 60, 700, {
       isStatic: true,
       friction: 0,
-      label: 'Wall'
+      label: "Wall",
     });
     World.add(engine.world, rightWall);
 
@@ -583,7 +479,6 @@ function calculateLineArea(body: any) {
 
       setNowBlock(newBlock);
 
-      
       World.add(engine.world, newBlock);
 
       // 다음 블록
@@ -611,9 +506,9 @@ function calculateLineArea(body: any) {
         }
         if (
           bodyA.parent.id === currentBlockIdRef.current ||
-          bodyB.parent.id === currentBlockIdRef.current 
+          bodyB.parent.id === currentBlockIdRef.current
         ) {
-          hasCollidedRef.current = true;
+         hasCollidedRef.current = true;
         }
       }
 
@@ -625,26 +520,25 @@ function calculateLineArea(body: any) {
       //   bodies.forEach((body) => {
       //     const startRow = Math.floor(body.bounds.min.y / blockSize);
       //     const endRow = Math.floor(body.bounds.max.y / blockSize);
-        
+
       //     for (let row = startRow; row <= endRow; row++) {
       //       if (!rowAreaCounts[row]) {
       //         rowAreaCounts[row] = 0;
       //       }
-        
+
       //       const overlapTop = Math.max(row * blockSize, body.bounds.min.y);
       //       const overlapBottom = Math.min((row + 1) * blockSize, body.bounds.max.y);
       //       const overlapHeight = overlapBottom - overlapTop;
-        
+
       //       // 블록의 너비를 계산
       //       const blockWidth = body.bounds.max.x - body.bounds.min.x;
-        
+
       //       // 삼각형의 넓이로 근사하여 면적을 계산
       //       const approxArea = (blockWidth * overlapHeight) / 2;
-        
+
       //       rowAreaCounts[row] += approxArea;
       //     }
       //   });
-        
 
       //   const originalBackgroundColor = render.options.background; // 원래의 배경색 저장
       //   Object.entries(rowAreaCounts).forEach(([row, area]) => {
@@ -681,7 +575,6 @@ function calculateLineArea(body: any) {
       //     }
       //   });
       // }
-
     });
 
     const moveBlock = (event: KeyboardEvent) => {
@@ -693,7 +586,7 @@ function calculateLineArea(body: any) {
       const xValues = block.vertices.map((vertex) => vertex.x);
       const minX = Math.min(...xValues); // 가장 왼쪽 x 좌표
       const maxX = Math.max(...xValues); // 가장 오른쪽 x 좌표
-  
+
       switch (event.key) {
         case "ArrowLeft":
           if (minX - blockSize <= leftWall.position.x + blockSize) {
@@ -712,7 +605,7 @@ function calculateLineArea(body: any) {
           // 바닥으로 블록을 이동
           Body.applyForce(block, block.position, { x: 0, y: 0.05 });
           // 블록의 색상을 변경
-          Body.set(block, 'render.fillStyle', '#ff00ff');
+          Body.set(block, "render.fillStyle", "#ff00ff");
           hasCollidedRef.current = true;
           break;
         case "z":
@@ -734,11 +627,8 @@ function calculateLineArea(body: any) {
           Body.rotate(block, Math.PI / 4);
           break;
 
-
         case "c":
-          
           let bodies = Composite.allBodies(engine.world);
-
           // allBodies는 현재 엔진의 world에 있는 모든 물리적 객체를 포함하는 배열입니다.
           bodies.forEach((body) => {
             if (body.label === "Wall") {
@@ -746,7 +636,7 @@ function calculateLineArea(body: any) {
               return;
             }
             removeLines(body); // 각 물리적 객체 정보 출력
-            calculateLineArea(body)
+            calculateLineArea(body);
           });
           break;
 
@@ -797,32 +687,32 @@ function calculateLineArea(body: any) {
         {" "}
         {/* position 속성을 추가합니다. */}
         <div
-        style={{
-          position: "absolute",
-          top: "90%",
-          left: "25%",
-          color: "white",
-          background: "rgba(255,0,0,0.5)",
-          padding: "0px",
-          fontSize: "48px",
-        }}
-      >
-        {message}
+          style={{
+            position: "absolute",
+            top: "90%",
+            left: "25%",
+            color: "white",
+            background: "rgba(255,0,0,0.5)",
+            padding: "0px",
+            fontSize: "48px",
+          }}
+        >
+          {message}
+        </div>
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: "30%",
+            color: "white",
+            background: "rgba(0,0,0,0.5)",
+            padding: "10px",
+            fontSize: "48px",
+          }}
+        >
+          score: {playerScore}
+        </div>
       </div>
-      <div
-        style={{
-          position: "absolute",
-          top: 0,
-          left: "30%",
-          color: "white",
-          background: "rgba(0,0,0,0.5)",
-          padding: "10px",
-          fontSize: "48px",
-        }}
-      >
-        score: {playerScore}
-      </div>
-    </div>
       <div style={{ position: "relative", width: 480, height: 320 }}>
         <video
           ref={videoRef}
