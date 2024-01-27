@@ -29,7 +29,13 @@ import {
 import BlockInfo from "./blockinfo.tsx";
 import { booleanMaskAsync } from "@tensorflow/tfjs";
 
-import { UnionFind, createBody, verticesToGeometry, geoJsonToVectors, shouldCombine} from "./calcultate.tsx";
+import {
+  UnionFind,
+  createBody,
+  verticesToGeometry,
+  geoJsonToVectors,
+  shouldCombine,
+} from "./calcultate.tsx";
 // 블록 생성 함수 배열
 const blockCreators: Array<(x: number, y: number) => Body> = [
   createIBlock,
@@ -47,7 +53,7 @@ function getRandomIndex(length: number): number {
 }
 
 // 랜덤한 블록 생성 함수
-function createRandomBlock(x: number, randomIndex: number) {
+function createRandomBlock(x: number, randomIndex: number): Block {
   const createBlock = blockCreators[randomIndex];
   return createBlock(x, 0); // 화면의 중앙 상단에서 블록 생성
 }
@@ -63,11 +69,110 @@ const line = [
 
 let nextBlockIndex: number = getRandomIndex(7);
 let playerScore = 0;
+
+interface Block extends Body {
+  sprite?: PIXI.Sprite;
+}
+let engine: Engine;
+
+function removeLines(body: any) {
+  World.remove(engine.world, body);
+  const bodyToAdd: any[] = [];
+  console.log(body);
+  for (let i = 1; i < body.parts.length; i++) {
+    const part = body.parts[i];
+    const poly = verticesToGeometry(part);
+    const cut = Cutter.diff(poly, line);
+    const cut1 = cut[0];
+    const cut2 = cut[1];
+
+    if (cut1) {
+      bodyToAdd.push(createBody(cut1, body.parts[i].render.fillStyle));
+    }
+
+    if (cut2) {
+      bodyToAdd.push(createBody(cut2, body.parts[i].render.fillStyle));
+    }
+  }
+
+  let unionFind = new UnionFind(bodyToAdd);
+  for (let i = 0; i < bodyToAdd.length; i++) {
+    for (let j = i + 1; j < bodyToAdd.length; j++) {
+      let result = shouldCombine(
+        bodyToAdd[i].vertices,
+        bodyToAdd[j].vertices,
+        1
+      );
+      if (result) {
+        unionFind.union(i, j);
+      }
+    }
+  }
+
+  const group = new Map<number, any[]>();
+  for (let i = 0; i < bodyToAdd.length; i++) {
+    let root = unionFind.find(i);
+    if (group.get(root)) {
+      group.get(root)?.push(bodyToAdd[i]);
+    } else {
+      group.set(root, []);
+      group.get(root)?.push(bodyToAdd[i]);
+    }
+  }
+  const realBodyToAdd: any[] = [];
+
+  group.forEach((value) => {
+    console.log("val", value);
+    let add = Body.create({
+      parts: value,
+    } as IChamferableBodyDefinition);
+    console.log("added:", add.id, value);
+    realBodyToAdd.push(add);
+  });
+
+  World.add(engine.world, realBodyToAdd);
+}
+
+function calculateArea(vertices: any) {
+  const n = vertices.length;
+  let area = 0;
+
+  for (let i = 0; i < n; i++) {
+    const current = vertices[i];
+    const next = vertices[(i + 1) % n];
+    area += current.x * next.y - next.x * current.y;
+  }
+
+  area = Math.abs(area) / 2;
+  return area;
+}
+
+function calculateLineArea(body: any) {
+  let sum = 0;
+  for (let i = 1; i < body.parts.length; i++) {
+    const part = body.parts[i];
+    const poly = verticesToGeometry(part);
+    const cut = Cutter.intersection(poly, line);
+    if (!cut) {
+      continue;
+    }
+    sum += calculateArea(geoJsonToVectors(cut[0]));
+  }
+  playerScore += sum;
+  return sum;
+}
+
+
+
+
+
+
+
+
 const Tetris: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  const sceneRef = useRef<HTMLDivElement>(null);
+  const sceneRef = useRef<HTMLCanvasElement>(null);
   let block: Body | null = null;
   const blockRef = useRef<Body | null>(null); // 블록 참조 저장
   const hasCollidedRef = useRef(false);
@@ -76,101 +181,20 @@ const Tetris: React.FC = () => {
   //const [playerScore, setPlayerScore] = useState(0);
   const [nowBlock, setNowBlock] = useState<Matter.Body | null>(null);
 
+  let box: Block;
+  let ground: Block;
+
+  
   // 엔진 생성
   const engine = Engine.create({
     // 중력 설정
     gravity: {
       x: 0,
-      y: 0.13,
+      y: 0.013,
     },
   });
 
-  function removeLines(body: any) {
-    World.remove(engine.world, body);
-    const bodyToAdd: any[] = [];
-    console.log(body);
-    for (let i = 1; i < body.parts.length; i++) {
-      const part = body.parts[i];
-      const poly = verticesToGeometry(part);
-      const cut = Cutter.diff(poly, line);
-      const cut1 = cut[0];
-      const cut2 = cut[1];
-
-      if (cut1) {
-        bodyToAdd.push(createBody(cut1, body.parts[i].render.fillStyle));
-      }
-
-      if (cut2) {
-        bodyToAdd.push(createBody(cut2, body.parts[i].render.fillStyle));
-      }
-    }
-
-    let unionFind = new UnionFind(bodyToAdd);
-    for (let i = 0; i < bodyToAdd.length; i++) {
-      for (let j = i + 1; j < bodyToAdd.length; j++) {
-        let result = shouldCombine(
-          bodyToAdd[i].vertices,
-          bodyToAdd[j].vertices,
-          1
-        );
-        if (result) {
-          unionFind.union(i, j);
-        }
-      }
-    }
-
-    const group = new Map<number, any[]>();
-    for (let i = 0; i < bodyToAdd.length; i++) {
-      let root = unionFind.find(i);
-      if (group.get(root)) {
-        group.get(root)?.push(bodyToAdd[i]);
-      } else {
-        group.set(root, []);
-        group.get(root)?.push(bodyToAdd[i]);
-      }
-    }
-    const realBodyToAdd: any[] = [];
-
-    group.forEach((value) => {
-      console.log("val", value);
-      let add = Body.create({
-        parts: value,
-      } as IChamferableBodyDefinition);
-      console.log("added:", add.id, value);
-      realBodyToAdd.push(add);
-    });
-
-    World.add(engine.world, realBodyToAdd);
-  }
-
-  function calculateArea(vertices: any) {
-    const n = vertices.length;
-    let area = 0;
-
-    for (let i = 0; i < n; i++) {
-      const current = vertices[i];
-      const next = vertices[(i + 1) % n];
-      area += current.x * next.y - next.x * current.y;
-    }
-
-    area = Math.abs(area) / 2;
-    return area;
-  }
-
-  function calculateLineArea(body: any) {
-    let sum = 0;
-    for (let i = 1; i < body.parts.length; i++) {
-      const part = body.parts[i];
-      const poly = verticesToGeometry(part);
-      const cut = Cutter.intersection(poly, line);
-      if (!cut) {
-        continue;
-      }
-      sum += calculateArea(geoJsonToVectors(cut[0]));
-    }
-    playerScore += sum;
-    return sum;
-  }
+  
 
   useEffect(() => {
     async function setupWebcam() {
@@ -424,23 +448,14 @@ const Tetris: React.FC = () => {
     runPosenet();
 
     if (!sceneRef.current) return;
-
+  
     // 렌더러 생성
-    const render = Render.create({
-      element: sceneRef.current,
-      engine: engine,
-      options: {
-        width: 600,
-        height: 800,
-        wireframes: false,
-        background: "#000000",
-      },
-    });
-
-
-    // 렌더러 시작
-    Render.run(render);
-
+    const app = new PIXI.Application({
+      width: 600,
+      height: 800,
+      backgroundColor: 0x000000,
+      view: sceneRef.current
+      });
     // 엔진 실행
     const runner = Runner.create();
     Runner.run(runner, engine);
@@ -451,6 +466,12 @@ const Tetris: React.FC = () => {
       label: "Wall",
     });
     World.add(engine.world, ground);
+    const groundGraphics = new PIXI.Graphics();
+    groundGraphics.beginFill(0x8B4513); // 갈색으로 채우기 시작
+    groundGraphics.drawRect(-305, -30, 610, 60); // 사각형 그리기
+    groundGraphics.endFill(); // 채우기 종료
+    groundGraphics.position.set(300, 700); // 위치 설정
+    app.stage.addChild(groundGraphics); // 스테이지에 추가
 
     // 왼쪽 벽 생성
     const leftWall = Bodies.rectangle(100, 370, 60, 700, {
@@ -459,6 +480,14 @@ const Tetris: React.FC = () => {
       label: "Wall",
     });
     World.add(engine.world, leftWall);
+    
+    const leftWallGraphics = new PIXI.Graphics();
+    leftWallGraphics.beginFill(0x8B4513); // 갈색으로 채우기 시작
+    leftWallGraphics.drawRect(-30, -350, 60, 700); // 사각형 그리기
+    leftWallGraphics.endFill(); // 채우기 종료
+    leftWallGraphics.position.set(100, 370); // 위치 설정
+    leftWallGraphics.pivot.set(0.5);  // 기준점을 중앙으로 설정
+    app.stage.addChild(leftWallGraphics); // 스테이지에 추가
 
     // 오른쪽 벽 생성
     const rightWall = Bodies.rectangle(500, 370, 60, 700, {
@@ -467,31 +496,80 @@ const Tetris: React.FC = () => {
       label: "Wall",
     });
     World.add(engine.world, rightWall);
+    
+    const rightWallGraphics = new PIXI.Graphics();
+    rightWallGraphics.beginFill(0x8B4513); // 갈색으로 채우기 시작
+    rightWallGraphics.drawRect(-30, -350, 60, 700); // 사각형 그리기
+    rightWallGraphics.endFill(); // 채우기 종료
+    rightWallGraphics.position.set(500, 370); // 위치 설정
+    rightWallGraphics.pivot.set(0.5);  // 기준점을 중앙으로 설정
+    app.stage.addChild(rightWallGraphics); // 스테이지에 추가
+
+    //  // Create a block
+    //  block = createIBlock(200, 0);
+    //  if (block.sprite) {
+    //    app.stage.addChild(block.sprite);
+    //  }
+    //  World.add(engine.world, block);
+
+    // app.ticker.add((delta) => {
+    //   if (block && block.sprite) {
+    //     block.sprite.rotation = block.angle;
+    //     block.sprite.x = block.position.x;
+    //     block.sprite.y = block.position.y;
+    //   }
+    //   Engine.update(engine, delta * (1000 / 60));
+    // });
+    
 
     // 일정 시간 간격으로 블록 생성
     const intervalId = setInterval(() => {
       hasCollidedRef.current = false;
       const createdSpot = (leftWall.position.x + rightWall.position.x) / 2;
-
+      console.log(`createdSpot is ${createdSpot}`);
       const newBlock = createRandomBlock(createdSpot, nextBlockIndex); // nextBlockIndex 사용
       blockRef.current = newBlock; // 블록 참조 업데이트
       currentBlockIdRef.current = newBlock.id; // 블록 id 참조 업데이트
 
       setNowBlock(newBlock);
 
+
+
       World.add(engine.world, newBlock);
+
+      if (newBlock.sprite) {
+        app.stage.addChild(newBlock.sprite);
+      }
+      app.ticker.add((delta) => {
+        // 물리 시뮬레이션 업데이트
+        Engine.update(engine, delta * (1000 / 60));
+      
+        // 모든 본체에 대해
+        for (var i = 0; i < engine.world.bodies.length; i++) {
+          const body = engine.world.bodies[i];
+      
+          // 물리 본체와 연결된 스프라이트가 있다면
+          if (body.sprite) {
+            // 스프라이트의 위치와 회전을 물리 본체에 맞춤
+            body.sprite.position.set(body.position.x, body.position.y);
+            body.sprite.rotation = body.angle;
+          }
+        }
+      });
+      
+
 
       // 다음 블록
       nextBlockIndex = getRandomIndex(7);
     }, 5000);
 
-    // 충돌 이벤트 처리
+    //충돌 이벤트 처리
     Events.on(engine, "collisionStart", (event) => {
       const pairs = event.pairs;
-
+      
       for (let i = 0; i < pairs.length; i++) {
         const { bodyA, bodyB } = pairs[i];
-
+        console.log(bodyA, bodyB);
         if (
           bodyA.parent.id === leftWall.id ||
           bodyB.parent.id === leftWall.id
@@ -508,73 +586,9 @@ const Tetris: React.FC = () => {
           bodyA.parent.id === currentBlockIdRef.current ||
           bodyB.parent.id === currentBlockIdRef.current
         ) {
-         hasCollidedRef.current = true;
+          hasCollidedRef.current = true;
         }
       }
-
-      // if (hasCollidedRef.current) {
-      //   // 한 줄이 80% 이상 차면 그 줄을 없애는 코드
-      //   const rowAreaCounts: { [key: number]: number } = {};
-      //   const bodies = Composite.allBodies(engine.world);
-
-      //   bodies.forEach((body) => {
-      //     const startRow = Math.floor(body.bounds.min.y / blockSize);
-      //     const endRow = Math.floor(body.bounds.max.y / blockSize);
-
-      //     for (let row = startRow; row <= endRow; row++) {
-      //       if (!rowAreaCounts[row]) {
-      //         rowAreaCounts[row] = 0;
-      //       }
-
-      //       const overlapTop = Math.max(row * blockSize, body.bounds.min.y);
-      //       const overlapBottom = Math.min((row + 1) * blockSize, body.bounds.max.y);
-      //       const overlapHeight = overlapBottom - overlapTop;
-
-      //       // 블록의 너비를 계산
-      //       const blockWidth = body.bounds.max.x - body.bounds.min.x;
-
-      //       // 삼각형의 넓이로 근사하여 면적을 계산
-      //       const approxArea = (blockWidth * overlapHeight) / 2;
-
-      //       rowAreaCounts[row] += approxArea;
-      //     }
-      //   });
-
-      //   const originalBackgroundColor = render.options.background; // 원래의 배경색 저장
-      //   Object.entries(rowAreaCounts).forEach(([row, area]) => {
-      //     if (area >= 0.7 * blockSize * 500) {
-      //       bodies.forEach((body) => {
-      //         if (
-      //           Math.floor(body.position.y / blockSize) === parseInt(row) &&
-      //           !body.isStatic
-      //         ) {
-      //           // 블록의 렌더링 옵션 변경
-      //           body.render.fillStyle = "red"; // 채우기 색상을 빨간색으로
-
-      //           Render.world(render); // 렌더러 다시 그리기
-
-      //           setTimeout(() => {
-      //             World.remove(engine.world, body, true);
-      //             setPlayerScore((prevPlayerScore) => prevPlayerScore + 100);
-      //             // 배경색 변경
-      //             render.options.background = "rgba(255, 255, 255, 0.5)";
-      //             Render.world(render); // 렌더러 다시 그리기
-
-      //             setTimeout(() => {
-      //               // 배경색 초기화
-      //               render.options.background = originalBackgroundColor;
-      //               Render.world(render); // 렌더러 다시 그리기
-      //               //setMessage("블록지우기 실행!");
-
-      //               // 0.5초 후에 메시지 지우기
-      //               setTimeout(() => setMessage(""), 500);
-      //             }, 500);
-      //           }, 500);
-      //         }
-      //       });
-      //     }
-      //   });
-      // }
     });
 
     const moveBlock = (event: KeyboardEvent) => {
@@ -632,7 +646,6 @@ const Tetris: React.FC = () => {
           // allBodies는 현재 엔진의 world에 있는 모든 물리적 객체를 포함하는 배열입니다.
           bodies.forEach((body) => {
             if (body.label === "Wall") {
-              console.log(body);
               return;
             }
             removeLines(body); // 각 물리적 객체 정보 출력
@@ -649,19 +662,18 @@ const Tetris: React.FC = () => {
     window.addEventListener("keydown", moveBlock);
 
     return () => {
-      render.canvas.remove();
-      // 클린업 함수
       // 엔진 정지
       Engine.clear(engine);
       // 렌더러 정지
-      Render.stop(render);
-      // Runner 정지
       Runner.stop(runner);
       // setInterval 제거
       clearInterval(intervalId);
 
       // 키보드 이벤트 제거
       window.removeEventListener("keydown", moveBlock);
+
+      // Pixi.js 애플리케이션 정리
+      app.destroy();
     };
   }, []);
 
@@ -675,7 +687,7 @@ const Tetris: React.FC = () => {
         overflow: "hidden",
       }}
     >
-      <div
+      <canvas
         ref={sceneRef}
         style={{
           width: "600px",
@@ -712,7 +724,7 @@ const Tetris: React.FC = () => {
         >
           score: {playerScore}
         </div>
-      </div>
+      </canvas>
       <div style={{ position: "relative", width: 480, height: 320 }}>
         <video
           ref={videoRef}
