@@ -10,6 +10,7 @@ export default class GeoJSONMapper {
         }
 
         if (geometry.length !== 1) {
+            console.log(geometry);
             console.error("invalid geometry");
             return;
         }

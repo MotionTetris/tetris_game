@@ -17,7 +17,7 @@ export class BlockCreator {
 
     public static create(x: number, y: number, option: BlockOption) {
         const parts = this.createParts(x, y, option);
-        return Body.create({ parts: parts });
+        return Body.create({ parts: parts, label: option.type});
     }
 
     private static createRectangle(x: number, y: number, xOffset: number, yOffset: number, option: BlockOption) {
@@ -25,7 +25,9 @@ export class BlockCreator {
         return Bodies.rectangle(x + xOffset * blockSize, y + yOffset * blockSize, blockSize, blockSize, {
             friction: option.friction,
             restitution: option.restitution,
-            render: { fillStyle: option.fillStyle }
+            render: { fillStyle: option.fillStyle },
+            slop: 0,
+            label: `${option.type} part`
         });
     }
 

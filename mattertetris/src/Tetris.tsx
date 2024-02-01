@@ -11,9 +11,10 @@ import "@tensorflow/tfjs";
 import TetrisGame, { BlockCollisionCallbackParam } from "./Tetris/TetrisGame.ts";
 import * as PIXI from "pixi.js";
 import Matter from "matter-js";
+import { Socket } from "./SocketClient/socket.ts";
+import { TetrisView } from "./Tetris/TetrisView.ts";
 
-const line = [[[100,490], [500, 490], [100, 550], [500, 550]]];
-
+const socket = new Socket();
 let playerScore = 0;
 const Tetris: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -33,6 +34,12 @@ const Tetris: React.FC = () => {
     },
   });
 
+  const otherEngine = Engine.create({
+    gravity: {
+      x: 0,
+      y: 0.13,
+    }
+  })
   useEffect(() => {
     async function setupWebcam() {
       const video = document.createElement("video");
@@ -50,7 +57,7 @@ const Tetris: React.FC = () => {
       }
       return video;
     }
-
+    
     async function runPosenet() {
       const net = await posenet.load();
       const video = await setupWebcam();
@@ -282,17 +289,17 @@ const Tetris: React.FC = () => {
         }
       }, 250);
     }
-    runPosenet();
+    //runPosenet();
 
     if (!sceneRef.current) return;
 
     // 렌더러 시작
     
-    function block({bodyA, bodyB}: BlockCollisionCallbackParam) {
-      console.log("ㅋㅋ", bodyA.position.y, bodyB.position.y);
+    async function block({bodyA, bodyB}: BlockCollisionCallbackParam) {
       if (bodyB.position.y < 10 || bodyA.position.y < 10) {
         return;
       }
+
       GAME.checkAndRemoveLines(GAME.appropriateScore);
 
       Body.setVelocity(bodyA, {x: 0, y: 0});
@@ -303,7 +310,6 @@ const Tetris: React.FC = () => {
       Body.setSpeed(bodyB, 0);
       Body.setStatic(bodyA, true);
       Body.setStatic(bodyB, true);
-      console.log(bodyA, bodyB, "오");
       GAME.spawnNewBlock();
     }
     
@@ -316,7 +322,17 @@ const Tetris: React.FC = () => {
           wireframes: false     // Set to true for wireframe rendering
       }
   });
-  const runner = Runner.create();
+  const otherRender = Matter.Render.create({
+    element: document.body,  // DOM element to render the canvas (document.body means it will be appended to the body)
+    engine: otherEngine,          // Reference to the Matter.js engine
+    options: {
+        width: 800,           // Width of the canvas
+        height: 800,          // Height of the canvas
+        wireframes: false     // Set to true for wireframe rendering
+    }
+});
+    const runner = Runner.create();
+    const othersRunner = Runner.create();
     const GAME = new TetrisGame({
       combineDistance: 1,
       engine: engine,
@@ -332,19 +348,42 @@ const Tetris: React.FC = () => {
     // 엔진 실행
     
     Runner.run(runner, engine);
+    Runner.run(othersRunner, otherEngine);
     render.canvas.tabIndex = 1;
     const event = (event: any) => GAME.onKeyboardEvent(event);
     render.canvas.addEventListener("keydown", event);
     render.canvas.focus();
+    const view = new TetrisView(otherEngine,
+      {
+        combineDistance: 1,
+        engine: otherEngine,
+        runner: othersRunner,
+        blockFriction: 1.0,
+        blockRestitution: 0.0,
+        blockSize: 32,
+        blockLandingCallback: block,
+        view: otherRender.canvas,
+        spawnY: -100
+      }
+    )
     Matter.Render.run(render);
+    Matter.Render.run(otherRender);
+    socket.sock.on("sync", (data) => {
+      view.applyWorld(data);
+    });
+    setInterval(() => {socket.sync(GAME.serialise());}, 100);
+    
     return () => {
       console.log("제거");
       // 클린업 함수
       // 엔진 정지
       Engine.clear(engine);
+      Engine.clear(otherEngine);
       // 렌더러 정지
+
       // Runner 정지
       Runner.stop(runner);
+      Runner.stop(othersRunner);
       // setInterval 제거
       GAME.dispose();
       render.canvas.removeEventListener("keydown", event);

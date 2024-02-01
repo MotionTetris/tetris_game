@@ -3,31 +3,34 @@ import TetrisGame, { TetrisOption } from "./TetrisGame";
 import { Bodies, Body } from "matter-js";
 
 export class Wall implements IObject {
-    private _game: TetrisGame;
     private _rigidBodies: Body[];
 
-    public constructor(game: TetrisGame, option: TetrisOption) {
-        this._game = game;
+    public constructor(option: TetrisOption) {
         this._rigidBodies = [];
         this.create(option.view.width, option.view.height, 10, 20, option.blockSize);
+        console.log("벽추가", option);
     }
 
     private create(canvasWidth: number, canvasHeight: number, width: number, height: number, blockSize: number) {
         const wall_thick = 60;
         const ground = Bodies.rectangle(canvasWidth / 2, height * blockSize + wall_thick / 2, canvasWidth, wall_thick, {
             isStatic: true,
+            friction: 1.0,
+            restitution: 0.0,
             label: 'ground'
         });
 
         const leftWall = Bodies.rectangle(canvasWidth / 2 - width / 2 * blockSize - wall_thick / 2, canvasHeight / 2, wall_thick, canvasHeight, {
             isStatic: true,
             friction: 0,
+            restitution: 0,
             label: 'wall'
         });
 
         const rightWall = Bodies.rectangle(canvasWidth / 2 + width / 2 * blockSize + wall_thick / 2, canvasHeight / 2, wall_thick, canvasHeight, {
             isStatic: true,
             friction: 0,
+            restitution: 0,
             label: 'wall'
         });
 

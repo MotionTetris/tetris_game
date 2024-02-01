@@ -1,11 +1,17 @@
 import Matter, { Bodies, Vertices, World, Body, Vector, Engine, Events } from "matter-js";
 import Mapper from "./Mapper";
-import { Geometry, diff, intersection } from "martinez-polygon-clipping";
+import { Geometry, diff, intersection, xor } from "martinez-polygon-clipping";
 import UnionFind from "./UnionFind";
 import { Tetromino } from "./Tetromino";
 import { Wall } from "./Wall";
 import backgroundSound from "../assets/sounds_themeA.ogg";
+import { SeamlessAudio } from "./SeamlessAudio";
+// @ts-ignore
+import * as Resurrect from 'resurrect-js';
 
+// @ts-ignore
+import { decomp } from 'poly-decomp';
+import { BlockCreator } from "./BlockCreator";
 export interface TetrisOption {
     engine: Matter.Engine;
     runner: Matter.Runner;
@@ -33,7 +39,9 @@ export default class TetrisGame {
     private lines: number[][][][];
     private _appropriateScore;
     private _bgm: HTMLAudioElement;
-
+    private loop?: SeamlessAudio;
+    private _serializer;
+    private lastSave?: string;
     public constructor(option: TetrisOption) {
         this.option = option;
         this.option.spawnX ??= this.option.view.width / 2;
@@ -41,14 +49,12 @@ export default class TetrisGame {
         this.option.combineDistance = 1;
         this.blocks = new Map();
         this.lines = this.createLines(0, option.blockSize * 20, option.blockSize);
-        this.wall = new Wall(this, option);
-        this._appropriateScore = option.blockSize * option.blockSize * 8;
+        this.wall = new Wall(option);
+        this._appropriateScore = option.blockSize * option.blockSize * 7.7;
         this.wall.rigidBodies.forEach((value) => this.addToWorld(value));
-        console.log(this.lines);
         Events.on(this.option.engine, "collisionStart", (event) => this.onCollisionStart(event));
         this._bgm = new Audio(backgroundSound);
         document.body.appendChild(this._bgm);
-        console.log(this._bgm);
         this._bgm.addEventListener('timeupdate', function(){
             var buffer = .25;
             if(this.currentTime > this.duration - buffer){
@@ -56,6 +62,22 @@ export default class TetrisGame {
                 this.play()
             }
         });
+        this._serializer = new Resurrect({ prefix: '$', cleanup: true });
+        this._serializer.parse = this._serializer.resurrect;
+        //@ts-ignore
+        window.decomp = decomp;
+    }
+
+    public serialise() {
+        return this._serializer.stringify(this.option.engine.world, (k: any, v: any) => v, 0);
+    }
+
+    public deserialise(json: string) {
+        let load = this._serializer.parse(json);
+
+        if (load) {
+            Engine.merge(this.option.engine, { world: load })
+        }
     }
 
     public get appropriateScore() {
@@ -150,6 +172,16 @@ export default class TetrisGame {
         this.addToWorld(newBlock.rigidBody, newBlock);
     }
 
+    public spawnTransparentBlock() {
+        let block = BlockCreator.create(-1000, -100, {
+            friction: this.option.blockFriction,
+            restitution: this.option.blockRestitution,
+            size: this.option.blockSize,
+            type: "I",
+            fillStyle: "red"
+        });
+        this.addToWorld(block);
+    }
     // #region Score calculations
     private calculateArea(vertices: any) {
         const n = vertices.length;
@@ -168,6 +200,15 @@ export default class TetrisGame {
     public calculateLineArea(block: Body, line: Geometry) {
         let sum = 0;
         const body = block;
+        if (body.parts.length === 1) {
+            const poly = Mapper.vectorsToGeoJSON(body);
+            const intersectionResult = intersection(poly, line);
+            if (intersectionResult) {
+                return this.calculateArea(Mapper.geoJSONToVectors(intersectionResult[0]));
+            }
+
+            return 0;
+        }
 
         for (let i = 1; i < body.parts.length; i++) {
             const part = body.parts[i];
@@ -195,21 +236,34 @@ export default class TetrisGame {
             console.log(`line[${i}]`, score);
             if (score >= threshold) {
                 scoreSum += score;
-                lineToRemove.push(i);
+                lineToRemove.push(this.lines[i]);
             }
         }
 
-        const lineIndex = lineToRemove.pop();
-        if (!lineIndex) {
+        
+        if (lineToRemove.length == 0) {
             return;
         }
-        for (let j = 0; j < bodies.length; j++) {
-            let result = this.removeLines(bodies[j], this.lines[lineIndex]);
+
+        console.log("lineToRemove", lineToRemove);
+        let line = lineToRemove.at(0);
+        if (!line) {
+            return;
+        }
+
+        this.pause();
+        let body = [...this.blocks.keys()];
+        console.log(body.length);
+        for (let j = 0; j < body.length; j++) {
+            let result = this.removeLines(body[j], line);
             if (result) {
-                this.removeFromWorld(bodies[j]);
+                this.removeFromWorld(body[j]);
                 result.forEach((value) => {
-                    if (value.area < 20) {
-                        // to small then ignore
+                    if (!value) {
+                        return;
+                    }
+
+                    if (value.area <= 100) {
                         return;
                     }
                     const newBody = value;
@@ -217,22 +271,40 @@ export default class TetrisGame {
                 });
             }
         }
+        this.resume(); 
     }
     // #endregion
 
     // #region Remove Lines 
     private removeLines(body: Body, line: Geometry) {
+        console.log(`before remove ${body.id}`, body);
         const diffResults: Body[] = [];
+
+        if (body.parts.length == 1) {
+            const geoJSON = Mapper.vectorsToGeoJSON(body);
+            const diffResult = diff(geoJSON, line);
+            const result = diffResult.map((r) => this.createRigidBody(r, body.render.fillStyle));
+
+            if (result) {
+                console.log(`after remove1 ${body.id}`, body);
+                return result;
+            }
+            return;
+        }
 
         for (let i = 1; i < body.parts.length; i++) {
             const part = body.parts[i];
             const geoJSON = Mapper.vectorsToGeoJSON(part);
             const diffResult = diff(geoJSON, line);
-            diffResults.push(...diffResult.map((r) => this.createRigidBody(r, body.parts[i].render.fillStyle)));
-        }
+            const result = diffResult.map((r) => this.createRigidBody(r, body.parts[i].render.fillStyle))
 
-        if (diffResults.length === 0) {
-            return;
+            for (let j = 0; j < result.length; j++) {
+                if (!result[j]) {
+                    continue;
+                }
+
+                diffResults.push(result[j]);
+            }
         }
 
         /* Merge new bodies. */
@@ -260,10 +332,11 @@ export default class TetrisGame {
 
         const bodyToAdd: Body[] = [];
         group.forEach((value) => {
-            let body = Body.create({
+            let a = Body.create({
                 parts: value
             });
-            bodyToAdd.push(body);
+            console.log(`after remove ${body.id}`, a);
+            bodyToAdd.push(a);
         });
 
         return bodyToAdd;
@@ -290,6 +363,10 @@ export default class TetrisGame {
 
     private createRigidBody(geometry: any, style?: string) {
         const points = Mapper.geoJSONToVectors(geometry);
+        if (!points || points.length < 3) {
+            return;
+        }
+
         return Bodies.fromVertices(Vertices.centre(points).x, Vertices.centre(points).y, points, {
             render: { fillStyle: style }
         });
@@ -333,7 +410,15 @@ export default class TetrisGame {
         if (this._bgm.played) {
             this._bgm.play();
         }
-        console.log("키보드 이벤트", event);
+        // if (!this.loop) {
+            // this.loop = new SeamlessAudio(backgroundSound, (err, loop) => {
+                // if (err) {
+                    // console.log(err);
+                // }
+    // 
+                // loop?.play();
+            // });
+        // }
         switch (event.key) {
             case "a":
                 if (!this._fallingBlock) {
@@ -362,6 +447,25 @@ export default class TetrisGame {
                 }
                 Body.rotate(this._fallingBlock, -Math.PI/180 * 90);
                 break;
+            case "c":
+                this.blocks.forEach((value) => {
+                    this.removeFromWorld(value.rigidBody);
+                });
+                this.spawnNewBlock();
+                break;
+            case "x":
+                this.lastSave = this.serialise();
+                console.log(this.lastSave);
+                break;
+            case "z":
+                if (!this.lastSave) {
+                    break;
+                }
+                this.deserialise(this.lastSave);
+                this.blocks.forEach((value) => {
+                    this.removeFromWorld(value.rigidBody);
+                });
+                this.spawnNewBlock();
         }
     }
     // #endregion
