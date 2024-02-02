@@ -1,16 +1,13 @@
 import {Graphics} from "./Graphics";
-import type * as RAPIER from "@dimforge/rapier2d";
+import * as RAPIER from "@dimforge/rapier2d";
+import { TetrisOption } from "./TetrisOption";
 
 type RAPIER_API = typeof import("@dimforge/rapier2d");
 
-type Builders = Map<string, (RAPIER: RAPIER_API, testbed: Testbed) => void>;
-
-export class Testbed {
-    RAPIER: RAPIER_API;
+export class TetrisGame {
     graphics: Graphics;
     inhibitLookAt: boolean;
     demoToken: number;
-    mouse: {x: number; y: number};
     events: RAPIER.EventQueue;
     world: RAPIER.World;
     preTimestepAction?: (gfx: Graphics) => void;
@@ -18,19 +15,18 @@ export class Testbed {
     lastMessageTime: number;
     snap: Uint8Array;
     snapStepId: number;
-
-    constructor(RAPIER: RAPIER_API, builders: Builders, canvas: HTMLCanvasElement) {
-        this.RAPIER = RAPIER;
+    option: TetrisOption;
+    
+    constructor(canvas: HTMLCanvasElement, option: TetrisOption) {
         this.graphics = new Graphics(canvas);
         this.inhibitLookAt = false;
         this.demoToken = 0;
-        this.mouse = {x: 0, y: 0};
         this.events = new RAPIER.EventQueue(true);
-
-        window.addEventListener("mousemove", (event) => {
-            this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-            this.mouse.y = 1 - (event.clientY / window.innerHeight) * 2;
-        });
+        this.option = option;
+        console.log("game created.");
+        if (!canvas) {
+            throw new Error("Canvas is null");
+        }
     }
 
     setpreTimestepAction(action: (gfx: Graphics) => void) {
@@ -47,9 +43,9 @@ export class Testbed {
         this.stepId = 0;
 
         world.forEachCollider((coll) => {
-            this.graphics.addCollider(this.RAPIER, world, coll);
+            this.graphics.addCollider(RAPIER, world, coll);
         });
-
+        console.log(world);
         this.lastMessageTime = new Date().getTime();
     }
 
@@ -69,14 +65,13 @@ export class Testbed {
     restoreSnapshot() {
         if (!!this.snap) {
             this.world.free();
-            this.world = this.RAPIER.World.restoreSnapshot(this.snap);
+            this.world = RAPIER.World.restoreSnapshot(this.snap);
             this.stepId = this.snapStepId;
         }
     }
 
     run() {
         this.world.numSolverIterations = 4;
-
         if (!!this.preTimestepAction) {
             this.preTimestepAction(this.graphics);
         }

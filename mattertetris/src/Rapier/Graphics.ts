@@ -1,7 +1,7 @@
 import { Viewport } from "pixi-viewport";
 import * as PIXI from "pixi.js";
 import type * as RAPIER from "@dimforge/rapier2d";
-//const RAPIER = await import('@dimforge/rapier2d');
+
 type RAPIER_API = typeof import("@dimforge/rapier2d");
 
 const BOX_INSTANCE_INDEX = 0;
@@ -29,9 +29,6 @@ export class Graphics {
         this.renderer = new PIXI.Renderer({
             backgroundColor: 0x292929,
             antialias: true,
-            resolution: pixelRatio,
-            width: window.innerWidth,
-            height: window.innerHeight,
             view: canvas
         });
 
@@ -40,14 +37,13 @@ export class Graphics {
         this.viewport = new Viewport({
             screenWidth: canvas.width,
             screenHeight: canvas.height,
-            worldWidth: 1000,
-            worldHeight: 1000,
+            worldWidth: 600,
+            worldHeight: 800,
             // @ts-ignore
-            interaction: this.renderer.plugins.interaction,
+            events: this.renderer.events
         });
 
-        this.scene.addChild(this.viewport);
-        this.viewport.drag().pinch().wheel().decelerate();
+        //this.scene.addChild(this.viewport);
 
         
         this.instanceGroups = [];
@@ -107,7 +103,7 @@ export class Graphics {
         this.coll2gfx = new Map();
         this.colorIndex = 0;
     }
-    
+
     lookAt(pos: {zoom: number; target: {x: number; y: number}}) {
         this.viewport.setZoom(pos.zoom);
         this.viewport.moveCenter(pos.target.x, pos.target.y);
@@ -133,7 +129,10 @@ export class Graphics {
                 graphics = instance.clone();
                 graphics.scale.x = hext.x;
                 graphics.scale.y = hext.y;
+                graphics.beginFill(this.colorPalette[instanceId], 1.0);
+                graphics.endFill();
                 this.viewport.addChild(graphics);
+                console.log(this.viewport);
                 break;
             case RAPIER.ShapeType.Ball:
                 let rad = collider.radius();

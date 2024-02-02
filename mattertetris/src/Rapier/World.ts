@@ -1,4 +1,4 @@
-import { TetrisOption } from "../Tetris/TetrisGame";
+import { TetrisOption } from "./TetrisOption";
 
 type RAPIER_API = typeof import("@dimforge/rapier2d");
 
@@ -17,15 +17,47 @@ export function initWorld(RAPIER: RAPIER_API, option: TetrisOption) {
         let colliderDesc = RAPIER.ColliderDesc.cuboid(ground.hx, ground.hy);
         world.createCollider(colliderDesc, body);
     });
+    let num = 1;
+    let numy = 1;
+    let rad = 1.0;
+
+    let shift = rad * 2.0 + rad; 
+    let centerx = shift * (num / 2);
+    let centery = shift / 2.0;
+
+    let i, j;
+
+    for (j = 0; j < numy; ++j) {
+        for (i = 0; i < num; ++i) {
+            let x = i * shift - centerx + 400.0 ;
+            let y = j * shift + centery + 400.0;
+
+            // Create dynamic cube.
+            let bodyDesc = RAPIER.RigidBodyDesc.dynamic().setTranslation(x, y);
+            let body = world.createRigidBody(bodyDesc);
+            let colliderDesc = RAPIER.ColliderDesc.cuboid(rad, rad).setTranslation(0, 0);
+            let colliderDesc2 = RAPIER.ColliderDesc.cuboid(rad, rad).setTranslation(0, 1 * 2 * rad);
+            let colliderDesc3 = RAPIER.ColliderDesc.cuboid(rad, rad).setTranslation(0, 2 * 2 * rad);
+            let colliderDesc4 = RAPIER.ColliderDesc.cuboid(rad, rad).setTranslation(0, 3 * 2 * rad);
+            world.createCollider(colliderDesc, body);
+            world.createCollider(colliderDesc2, body);
+            world.createCollider(colliderDesc3, body);
+            world.createCollider(colliderDesc4, body);
+            body.addTorque(1, true);
+
+            world.createCollider(RAPIER.ColliderDesc.convexHull(new Float32Array([0, 0, 100, 100, 100, -100]))!, body);
+        }
+    }
+    return world;
 }
 
 function createWall(canvasWidth: number, canvasHeight: number, width: number, height: number, blockSize: number) {
     const wall_thick = 60;
     const ground = {
-        x: canvasWidth / 2,
-        y: height * blockSize + wall_thick / 2,
-        hx: canvasWidth,
-        hy: wall_thick,
+        x: 0,
+        y: 0,
+        hx: 10000,
+        hy: 50,
     }
 
     const left_wall = {
