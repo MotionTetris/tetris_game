@@ -16,8 +16,8 @@ export function initWorld(RAPIER: RAPIER_API, option: TetrisOption) {
         let body = world.createRigidBody(bodyDesc);
 
         let colliderDesc = RAPIER.ColliderDesc
-                                 .cuboid(ground.hx, ground.hy);
-                                 //.setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
+                                 .cuboid(ground.hx, ground.hy)
+                                 .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
         world.createCollider(colliderDesc, body);
     });
 
