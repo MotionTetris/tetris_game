@@ -251,7 +251,6 @@ export default class TetrisGame {
             return;
         }
 
-        this.pause();
         let body = [...this.blocks.keys()];
         console.log(body.length);
         for (let j = 0; j < body.length; j++) {
@@ -271,7 +270,6 @@ export default class TetrisGame {
                 });
             }
         }
-        this.resume(); 
     }
     // #endregion
 

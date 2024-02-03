@@ -1,5 +1,5 @@
-import { Viewport } from "pixi-viewport";
 import * as PIXI from "pixi.js";
+import {Viewport} from "pixi-viewport";
 import type * as RAPIER from "@dimforge/rapier2d";
 
 type RAPIER_API = typeof import("@dimforge/rapier2d");
@@ -21,7 +21,7 @@ export class Graphics {
 
     constructor(canvas: HTMLCanvasElement) {
         // High pixel Ratio make the rendering extremely slow, so we cap it.
-        const pixelRatio = window.devicePixelRatio ? Math.min(window.devicePixelRatio, 1.5) : 1;
+        // const pixelRatio = window.devicePixelRatio ? Math.min(window.devicePixelRatio, 1.5) : 1;
 
         this.coll2gfx = new Map();
         this.colorIndex = 0;
@@ -29,27 +29,41 @@ export class Graphics {
         this.renderer = new PIXI.Renderer({
             backgroundColor: 0x292929,
             antialias: true,
-            view: canvas
+            // resolution: pixelRatio,
+            width: canvas.width,
+            height: canvas.height,
         });
 
         this.scene = new PIXI.Container();
+        document.body.appendChild(this.renderer.view);
 
         this.viewport = new Viewport({
-            screenWidth: canvas.width,
-            screenHeight: canvas.height,
-            worldWidth: 600,
-            worldHeight: 800,
-            // @ts-ignore
-            events: this.renderer.events
+            screenWidth: window.innerWidth,
+            screenHeight: window.innerHeight,
+            worldWidth: canvas.width,
+            worldHeight: canvas.height,
+            interaction: this.renderer.plugins.interaction,
         });
 
-        //this.scene.addChild(this.viewport);
+        this.scene.addChild(this.viewport);
+        this.viewport.drag().pinch().wheel().decelerate();
 
+        let me = this;
+
+        function onWindowResize() {
+            //me.renderer.resize(window.innerWidth, window.innerHeight);
+        }
+
+        function onContextMenu(event: UIEvent) {
+            event.preventDefault();
+        }
+
+        document.oncontextmenu = onContextMenu;
+        document.body.oncontextmenu = onContextMenu;
+        this.viewport.setTransform(0, 100);
+        window.addEventListener("resize", onWindowResize, false);
         
-        this.instanceGroups = [];
-        this.initInstances();
-        this.lines = new PIXI.Graphics();
-        this.viewport.addChild(this.lines);
+        this.initInstances();   
     }
 
     initInstances() {
@@ -75,10 +89,41 @@ export class Graphics {
         );
     }
 
-    render(world: RAPIER.World) {
+    render(world: RAPIER.World, debugRender: Boolean) {
         kk += 1;
+        if (!this.lines) {
+            this.lines = new PIXI.Graphics();
+            this.viewport.addChild(this.lines);
+        }
+
+        if (debugRender) {
+            let buffers = world.debugRender();
+            let vtx = buffers.vertices;
+            let cls = buffers.colors;
+
+            this.lines.clear();
+
+            for (let i = 0; i < vtx.length / 4; i += 1) {
+                let color = PIXI.utils.rgb2hex([
+                    cls[i * 8],
+                    cls[i * 8 + 1],
+                    cls[i * 8 + 2],
+                ]);
+                this.lines.lineStyle(1.0, color, cls[i * 8 + 3], 0.5, true);
+                this.lines.moveTo(vtx[i * 4], -vtx[i * 4 + 1]);
+                this.lines.lineTo(vtx[i * 4 + 2], -vtx[i * 4 + 3]);
+            }
+        } else {
+            this.lines.clear();
+        }
+
         this.updatePositions(world);
         this.renderer.render(this.scene);
+    }
+
+    lookAt(pos: {zoom: number; target: {x: number; y: number}}) {
+        this.viewport.setZoom(pos.zoom);
+        this.viewport.moveCenter(pos.target.x, pos.target.y);
     }
 
     updatePositions(world: RAPIER.World) {
@@ -104,11 +149,6 @@ export class Graphics {
         this.colorIndex = 0;
     }
 
-    lookAt(pos: {zoom: number; target: {x: number; y: number}}) {
-        this.viewport.setZoom(pos.zoom);
-        this.viewport.moveCenter(pos.target.x, pos.target.y);
-    }
-
     addCollider(
         RAPIER: RAPIER_API,
         world: RAPIER.World,
@@ -119,7 +159,6 @@ export class Graphics {
         let instance;
         let graphics;
         let vertices;
-        // @ts-ignore
         let instanceId = parent.isFixed() ? 0 : this.colorIndex + 1;
 
         switch (collider.shapeType()) {
@@ -129,10 +168,7 @@ export class Graphics {
                 graphics = instance.clone();
                 graphics.scale.x = hext.x;
                 graphics.scale.y = hext.y;
-                graphics.beginFill(this.colorPalette[instanceId], 1.0);
-                graphics.endFill();
                 this.viewport.addChild(graphics);
-                console.log(this.viewport);
                 break;
             case RAPIER.ShapeType.Ball:
                 let rad = collider.radius();
@@ -191,10 +227,6 @@ export class Graphics {
                 break;
         }
 
-        if (!graphics) {
-            return;
-        }
-
         let t = collider.translation();
         let r = collider.rotation();
         //        dummy.position.set(t.x, t.y, t.z);
@@ -210,5 +242,7 @@ export class Graphics {
         this.coll2gfx.set(collider.handle, graphics);
         this.colorIndex =
             (this.colorIndex + 1) % (this.colorPalette.length - 1);
+
+        return graphics;
     }
 }
