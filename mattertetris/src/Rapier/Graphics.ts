@@ -15,7 +15,8 @@ export class Graphics {
     colorIndex: number;
     colorPalette: Array<number>;
     renderer: PIXI.Renderer;
-    scene: PIXI.Container; //자식 컨테이너1
+    scene: PIXI.Container; 
+    //particleContainer: PIXI.ParticleContainer;
     viewport: Viewport;
     instanceGroups: Array<Array<PIXI.Graphics>>;
     lines: PIXI.Graphics;
@@ -38,9 +39,9 @@ export class Graphics {
 
         this.scene = new PIXI.Container();
         
-
         document.body.appendChild(this.renderer.view);
 
+        //this.particleContainer = new PIXI.ParticleContainer(100, { alpha: true, scale: true });
         this.viewport = new Viewport({
             screenWidth: window.innerWidth,
             screenHeight: window.innerHeight,

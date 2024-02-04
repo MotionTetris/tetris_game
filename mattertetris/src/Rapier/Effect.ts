@@ -1,28 +1,29 @@
 import * as PIXI from "pixi.js";
 import {Viewport} from "pixi-viewport";
 // 폭발 효과 함수 (정사각형 흩어지는 효과)
-export const explodeParticleEffect = (app: PIXI.Application, effect: PIXI.ParticleContainer,x: number, y: number) => {
+export const explodeParticleEffect = (viewport: Viewport, scene: PIXI.Container,x: number, y: number) => {
   // 100개의 입자를 생성
-    for (let i = 0; i < 100; i++) {
+  const effectParticle = new PIXI.Sprite(PIXI.Texture.WHITE);  
+  for (let i = 0; i < 100; i++) {
       // 각 입자는 작은 흰색 사각형으로 표현
-        const effectParticle = new PIXI.Sprite(PIXI.Texture.WHITE);
-        effectParticle.tint = 0xff0000; // 입자 색상 설정
-        effectParticle.width = effectParticle.height = Math.random() * 5 + 5; // 입자 크기 설정
+
+    effectParticle.tint = 0xff0000; // 입자 색상 설정
+    effectParticle.width = effectParticle.height = Math.random() * 5 + 5; // 입자 크기 설정
 
         // 파티클의 위치를 라인의 직사각형 범위 내로 설정
-        effectParticle.x = x + Math.random() * 320;
-        effectParticle.y = y + Math.random() * 32;
+    effectParticle.x = x + Math.random() * 320;
+    effectParticle.y = y + Math.random() * 32;
 
         // 각 입자는 무작위 방향으로 이동
-        effectParticle.vx = Math.random() * 5 - 2.5;
-        effectParticle.vy = Math.random() * 5 - 2.5;
+    effectParticle.vx = Math.random() * 5 - 2.5;
+    effectParticle.vy = Math.random() * 5 - 2.5;
 
         // 입자를 ParticleContainer에 추가
-        effect.addChild(effectParticle);
-    }
+    scene.addChild(effectParticle);
+  }
     const moveEffectParticles = () => {
-        for (let i = effect.children.length - 1; i >= 0; i--) {
-            const effectParticle = effect.children[i] as PIXI.Sprite;
+        for (let i = scene.children.length - 1; i >= 0; i--) {
+            const effectParticle = scene.children[i] as PIXI.Sprite;
             effectParticle.x += effectParticle.vx;
             effectParticle.y += effectParticle.vy;
             effectParticle.alpha -= 0.01;
@@ -30,16 +31,15 @@ export const explodeParticleEffect = (app: PIXI.Application, effect: PIXI.Partic
 
             // 입자가 완전히 투명해지면 ParticleContainer에서 제거
             if (effectParticle.alpha <= 0) {
-                effect.removeChild(effectParticle);
+                scene.removeChild(effectParticle);
             }
         }
 
         // 모든 입자가 제거되면 ticker에서 이 함수를 제거
-        if (effect.children.length === 0) {
-            app.ticker.remove(moveEffectParticles);
+        if (scene.children.length === 0) {
+            view.remove(moveEffectParticles);
         }
     };
-
     app.ticker.add(moveEffectParticles);
 };
 

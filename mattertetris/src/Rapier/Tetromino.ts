@@ -35,7 +35,7 @@ export class Tetromino {
             this._rigidBody = world.createRigidBody(bodyDesc);
             this._rigidBody.userData = blockType;
             BlockCreator.createTetromino(option.blockSize, blockType).forEach((value) => {
-                world.createCollider(value, this._rigidBody);
+                world.createCollider(value, this._rigidBody).setRestitution(0);
             });
         }
 

@@ -7,7 +7,7 @@ export function createLines(startY: number, endY: number, thickness: number, x: 
         throw new Error("startX must be lower than endY");
     }
 
-    for (let i = startY; i <= endY + thickness; i += thickness) {
+    for (let i = startY; i < endY + thickness; i += thickness) {
         lines.push([[[x, i], [x, i + thickness], [-x, i + thickness], [-x, i], [x, i]]]);
     }
     return lines;

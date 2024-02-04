@@ -106,7 +106,7 @@ function shouldCombine(body1: Float32Array, body2: Float32Array, maxDistance: nu
 
 /* Prevent crashing engine */
 function checkShape(vertices: Float32Array) {
-    if (calculateArea(vertices) > 20) {
+    if (calculateArea(vertices) > 50) {
         return true;
     }
     return false;

@@ -4,12 +4,12 @@ import { TetrisOption } from "./TetrisOption";
 import { BlockType, Tetromino } from "./Tetromino";
 import { createLines } from "./Line";
 import { calculateLineIntersectionArea } from "./BlockScore";
-import { removeLines } from "./BlockRemove";
-import { collisionParticleEffect, generateParticleTexture } from "./Effect";
+import { removeLines as removeShapeWithLine } from "./BlockRemove";
+import { collisionParticleEffect, explodeParticleEffect, generateParticleTexture } from "./Effect";
 import { KeyFrameEvent, MultiPlayerContext } from "./Multiplay";
 
 type RAPIER_API = typeof import("@dimforge/rapier2d");
-
+type Line = number[][][]
 export class TetrisGame {
     graphics: Graphics;
     inhibitLookAt: boolean;
@@ -101,6 +101,10 @@ export class TetrisGame {
             });
         }
     }
+    
+    updateSequence() {
+        this.sequence += 1;
+    }
 
     receiveKeyFrameEvent(event: KeyFrameEvent) {
         if (!this.multiPlayerContext) {
@@ -143,15 +147,8 @@ export class TetrisGame {
 
             const body1 = this.world.getCollider(handle1);
             const body2 = this.world.getCollider(handle2);
-            console.log(collider1.translation().x, collider1.translation().y);
-            // 두 콜라이더의 위치를 평균내어 충돌 위치를 계산
-            let collisionX = (collider1.translation().x + collider2.translation().x) / 2;
-            let collisionY = (collider1.translation().y + collider2.translation().y) / 2;
-
-            collisionParticleEffect(collisionX, -collisionY, this.graphics.viewport, this.graphics.renderer);
             this.onCollisionDetected(body1, body2);
         });
-        
 
         requestAnimationFrame(() => this.run());
     }
@@ -178,17 +175,20 @@ export class TetrisGame {
             type: 'block'
         };
 
-        this.tetrominos.add(newBody);
+        
 
         if (spawnedForFalling) {
             this.fallingTetromino = newBody;
+            return newBody;
         }
+        this.tetrominos.add(newBody);
         return newBody;
     }
 
     spawnFromRigidBody(color: number, rigidBody: RAPIER.RigidBody) {
         let tetromino = new Tetromino(this.option, this.world, this.graphics.viewport, rigidBody, color);
         for (let i = 0; i < rigidBody.numColliders(); i++) {
+            rigidBody.collider(i).setRestitution(0);
             rigidBody.collider(i).setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
         }
         this.tetrominos.add(tetromino);
@@ -223,8 +223,9 @@ export class TetrisGame {
                 type: 'block'
             };
 
-            for (let colider of coliderDesc) {
-                this.world.createCollider(colider, body);
+            for (let collider of coliderDesc) {
+                collider.setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
+                this.world.createCollider(collider, body);
             }
 
             let shape = new Tetromino(this.option, this.world, this.graphics.viewport, body, color);
@@ -240,8 +241,9 @@ export class TetrisGame {
                 }
             }
             this.tetrominos.add(shape);
+            console.log(shape.rigidBody.translation());
         }
-
+        
         return shapes;
     }
 
@@ -263,9 +265,10 @@ export class TetrisGame {
         this.tetrominos.add(newBody);
     }
 
-    checkAndRemoveLines(threshold: number) {
+    checkLine(threshold: number) {
         let scoreSum = 0;
-        let lineToRemove = [];
+        let lineToRemove: Line[] = [];
+        let lineIndices: number[] = [];
         for (let i = 0; i < this.lines.length; i++) {
             let score = 0;
             this.tetrominos.forEach((value) => {
@@ -276,27 +279,38 @@ export class TetrisGame {
             if (score >= threshold) {
                 scoreSum += score;
                 lineToRemove.push(this.lines[i]);
+                lineIndices.push(i);
             }
         }
         
-        if (lineToRemove.length === 0) {
-            return;
+        return {
+            lines: lineToRemove,
+            area: scoreSum,
+            lineIndices: lineIndices
         }
-        
-        // TODO: Shape-cast and remove without removing and re-create all shapes in the world 
+    }
+
+    /* If nothing can be removed, it returns false. otherwise returns true. */
+    removeLines(lineToRemove: Line[]) {
+        if (lineToRemove.length === 0) {
+            return false;
+        }
+
+        // TODO: Shape-cast and remove without removing and re-create all shapes in the world
         for (const line of lineToRemove) {
             const shapes = [...this.tetrominos];
             shapes.forEach((value) => {
-                let result = removeLines(value.rigidBody, line);
+                let result = removeShapeWithLine(value.rigidBody, line);
                 let color = value.fillStyle;
                 this.removeBlock(value);
                 if (!result) {
                     return;
                 }
-
                 this.spawnFromColliderDescs(color, result);
             });
         }
+
+        return true;
     }
 
     onCollisionDetected(collider1: RAPIER.Collider, collider2: RAPIER.Collider) {
@@ -307,16 +321,26 @@ export class TetrisGame {
             return;
         }
 
-        if (this.fallingTetromino && (fallingBody === body1.handle || fallingBody === body2.handle)) {
+        if (this.isFalling(body1, body2) && !this.collideWithWall(body1, body2)) {
+            this.tetrominos.add(this.fallingTetromino);
             this.fallingTetromino = undefined;
             if (this.option.blockLandingCallback) {
-                this.option.blockLandingCallback({bodyA: body1, bodyB: body2});
+                this.option.blockLandingCallback({bodyA: collider1, bodyB: collider2});
             }
             return;
         }
 
         if (this.option.blockCollisionCallback) {
-            this.option.blockCollisionCallback({bodyA: body1, bodyB: body2});
+            this.option.blockCollisionCallback({bodyA: collider1, bodyB: collider2});
         }
+    }
+
+    private isFalling(body1: RAPIER.RigidBody, body2: RAPIER.RigidBody) {
+        const fallingBody = this.fallingTetromino?.rigidBody?.handle;
+        return this.fallingTetromino && (fallingBody === body1.handle || fallingBody === body2.handle)
+    }
+
+    private collideWithWall(body1: RAPIER.RigidBody, body2: RAPIER.RigidBody) {
+        return (body1.userData?.type === "left_wall" || body1.userData?.type === "right_wall") || (body2.userData?.type === "left_wall" || body2.userData?.type === "right_wall")
     }
 }

@@ -37,7 +37,7 @@ export class MultiPlayerContext {
     }
 
     public isEventValid(event: KeyFrameEvent) {
-        if (this.lastSequence !== event.sequence + 1) {
+        if (this.lastSequence !== event.sequence - 1) {
             return false; 
         }
 

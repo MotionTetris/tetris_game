@@ -6,7 +6,7 @@ import { Tetromino } from "./Rapier/Tetromino.ts";
 import { calculateLineIntersectionArea } from "./Rapier/BlockScore.ts";
 import { createLines } from "./Rapier/Line.ts";
 import { Container, SceneCanvas, EffectCanvas, VideoContainer, Video, VideoCanvas } from "./style.tsx";
-import { createLineEffect } from "./Rapier/Effect.ts";
+import { collisionParticleEffect, createLineEffect, explodeParticleEffect } from "./Rapier/Effect.ts";
 import * as PIXI from "pixi.js";
 import { runPosenet } from "./Rapier/WebcamPosenet.ts";
 import "@tensorflow/tfjs";
@@ -28,13 +28,26 @@ const Tetris: React.FC = () => {
     
     sceneRef.current.width = 600;
     sceneRef.current.height = 800;
-    const CollisionEvent = (event: any) => {
-      console.log("충돌!", event);
-      
+    const CollisionEvent = ({bodyA, bodyB}: any) => {
+      // console.log(bodyA.translation().x, bodyB.translation().y);
+      // 두 콜라이더의 위치를 평균내어 충돌 위치를 계산
+
     }
 
-    const LandingEvent = (event: any) => {
-      console.log("랜딩!", event);
+    const LandingEvent = ({bodyA, bodyB}: any) => {
+      let collisionX = (bodyA.translation().x + bodyB.translation().x) / 2;
+      let collisionY = (bodyA.translation().y + bodyB.translation().y) / 2;
+      //collisionParticleEffect(collisionX, -collisionY, game.graphics.viewport, game.graphics.renderer);
+      console.log("랜딩!");
+      const checkResult = game.checkLine(10000);
+      // for (let i = 0; i < checkResult.lineIndices.length; i++) {
+      //   explodeParticleEffect(game.graphics.viewport, game.graphics.scene, 140, checkResult.lineIndices[i]);
+      // }
+      if (game.removeLines(checkResult.lines)) {
+        console.log(`score: ${checkResult.area}`);
+      }
+      
+      game.spawnBlock(0xFF0000, "I", true);
     }
 
     const game = new TetrisGame({
@@ -44,6 +57,7 @@ const Tetris: React.FC = () => {
       combineDistance: 1,
       view: sceneRef.current,
       spawnX: sceneRef.current.width / 2,
+      spawnY: 100,
       blockCollisionCallback: CollisionEvent,
       blockLandingCallback: LandingEvent
     }, false);
@@ -55,27 +69,14 @@ const Tetris: React.FC = () => {
       combineDistance: 1,
       view: sceneRef.current,
       spawnX: sceneRef.current.width / 2,
+      spawnY: 200,
       blockCollisionCallback: CollisionEvent,
       blockLandingCallback: LandingEvent
     }));
-    game.graphics.ticker.start();
+    
     runPosenet(videoRef, canvasRef, game);
     game.run();
-    game.spawnBlock(0xFF0000, "I", true);
-    // setInterval(() => {
-    //   let block = game.spawnBlock(0xFF0000, "J")
-    //   const area = calculateLineIntersectionArea(block.rigidBody, [[[10000, -568], [-10000, -568], [-10000, -600], [10000, -600], [10000, -568]]]);
-    //   console.log(area);
-    // }, 1000);
-    // TODO: DO NOT CREATE BLOCK WITH SETINTERVAL BECAUSE IT IS NON-DETERMINSTIC (IT IS NOT ACCURACY TIMER!)
-    let removed = false;
-    let id = setInterval(() => {
-      game.spawnBlock(0xFF0000, "I", true);
-    }, 3000);
-
-    setInterval(() => {
-      game.checkAndRemoveLines(3000);
-    }, 9000);
+    game.spawnBlock(0xFF0000, "S", true);
   return () => {}}, []);
 
   return (
