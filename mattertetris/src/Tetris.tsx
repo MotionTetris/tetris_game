@@ -5,7 +5,7 @@ import { calculatePosition, removeLines } from "./Rapier/BlockRemove.ts";
 import { Tetromino } from "./Rapier/Tetromino.ts";
 import { calculateLineIntersectionArea } from "./Rapier/BlockScore.ts";
 import { createLines } from "./Rapier/Line.ts";
-import { Container, SceneCanvas, EffectCanvas, VideoContainer, Video, VideoCanvas } from "./style.tsx";
+import { Container, SceneCanvas, EffectCanvas, VideoContainer, Video, VideoCanvas, MessageDiv } from "./style.tsx";
 import { collisionParticleEffect, createLineEffect, explodeParticleEffect } from "./Rapier/Effect.ts";
 import * as PIXI from "pixi.js";
 import { runPosenet } from "./Rapier/WebcamPosenet.ts";
@@ -18,6 +18,7 @@ const Tetris: React.FC = () => {
   const sceneRef = useRef<HTMLCanvasElement>(null);  //게임화면
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
 
@@ -37,9 +38,18 @@ const Tetris: React.FC = () => {
     const LandingEvent = ({bodyA, bodyB}: any) => {
       let collisionX = (bodyA.translation().x + bodyB.translation().x) / 2;
       let collisionY = (bodyA.translation().y + bodyB.translation().y) / 2;
+      console.log("Translation", bodyA.translation().y, bodyB.translation().y);
+      if (bodyA.translation().y > -400 || bodyB.translation().y > -400) {
+        console.log("game ended");
+        setMessage("게임오버")
+        game.stop();
+      }
+      
       //collisionParticleEffect(collisionX, -collisionY, game.graphics.viewport, game.graphics.renderer);
+      collisionParticleEffect(bodyA.translation().x, -bodyB.translation().y, game.graphics.viewport, game.graphics.renderer);
+      collisionParticleEffect(bodyB.translation().x, -bodyB.translation().y, game.graphics.viewport, game.graphics.renderer);
       console.log("랜딩!");
-      const checkResult = game.checkLine(10000);
+      const checkResult = game.checkLine(12000);
       // for (let i = 0; i < checkResult.lineIndices.length; i++) {
       //   explodeParticleEffect(game.graphics.viewport, game.graphics.scene, 140, checkResult.lineIndices[i]);
       // }
@@ -47,7 +57,7 @@ const Tetris: React.FC = () => {
         console.log(`score: ${checkResult.area}`);
       }
       
-      game.spawnBlock(0xFF0000, "I", true);
+      game.spawnBlock(0xFF0000, "O", true);
     }
 
     const game = new TetrisGame({
@@ -57,7 +67,7 @@ const Tetris: React.FC = () => {
       combineDistance: 1,
       view: sceneRef.current,
       spawnX: sceneRef.current.width / 2,
-      spawnY: 100,
+      spawnY: 200,
       blockCollisionCallback: CollisionEvent,
       blockLandingCallback: LandingEvent
     }, false);
@@ -75,12 +85,14 @@ const Tetris: React.FC = () => {
     }));
     
     runPosenet(videoRef, canvasRef, game);
+    game.running = true;
     game.run();
     game.spawnBlock(0xFF0000, "S", true);
   return () => {}}, []);
 
   return (
     <Container>
+    <MessageDiv> 메시지{message} </MessageDiv>
       <SceneCanvas id = "game" ref = {sceneRef}> </SceneCanvas>
       <VideoContainer>
         <Video ref={videoRef} autoPlay/>

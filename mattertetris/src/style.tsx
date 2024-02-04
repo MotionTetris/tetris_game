@@ -48,3 +48,15 @@ export const VideoCanvas = styled.canvas`
   width: 480px;
   height: 320px;
 `;
+
+
+export const MessageDiv = styled.div`
+  position: absolute;
+  top: 10%;
+  left: 47%;
+  color: white;
+  background: rgba(255, 0, 0, 0.5);
+  padding: 0px;
+  font-size: 48px;
+  z-index: 5;
+`;

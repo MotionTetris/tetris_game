@@ -7,6 +7,8 @@ import { calculateLineIntersectionArea } from "./BlockScore";
 import { removeLines as removeShapeWithLine } from "./BlockRemove";
 import { collisionParticleEffect, explodeParticleEffect, generateParticleTexture } from "./Effect";
 import { KeyFrameEvent, MultiPlayerContext } from "./Multiplay";
+import { BlockColorList } from "../Tetris/BlockCreator";
+import { valueAndGrad } from "@tensorflow/tfjs";
 
 type RAPIER_API = typeof import("@dimforge/rapier2d");
 type Line = number[][][]
@@ -125,10 +127,6 @@ export class TetrisGame {
 
     run() {
         this.world.numSolverIterations = 4;
-        if (!!this.preTimestepAction) {
-            this.preTimestepAction(this.graphics);
-        }
-
         if (this.multiPlayerContext) {
             if (this.stepId >= this.multiPlayerContext.lastKeyframe) {
                 this.running = false;
@@ -136,7 +134,14 @@ export class TetrisGame {
             }
         }
 
-        this.running = true;
+        if (!this.running) {
+            return;
+        }
+
+        if (!!this.preTimestepAction) {
+            this.preTimestepAction(this.graphics);
+        }
+
         this.world.step(this.events);
         this.stepId += 1;
         this.graphics.render(this.world, false);
@@ -151,6 +156,16 @@ export class TetrisGame {
         });
 
         requestAnimationFrame(() => this.run());
+    }
+
+    stop() {
+        // [...this.tetrominos].forEach((value) => {
+        //     value.remove();
+        //     this.tetrominos.delete(value);
+        // });
+
+        this.running = false;
+        console.log("게임오버");
     }
 
     removeBlock(block: Tetromino) {
@@ -296,6 +311,7 @@ export class TetrisGame {
             return false;
         }
 
+        lineToRemove = [lineToRemove.pop()!];
         // TODO: Shape-cast and remove without removing and re-create all shapes in the world
         for (const line of lineToRemove) {
             const shapes = [...this.tetrominos];
@@ -323,10 +339,12 @@ export class TetrisGame {
 
         if (this.isFalling(body1, body2) && !this.collideWithWall(body1, body2)) {
             this.tetrominos.add(this.fallingTetromino);
+            this.fallingTetromino?.rigidBody.resetForces(true);
             this.fallingTetromino = undefined;
             if (this.option.blockLandingCallback) {
                 this.option.blockLandingCallback({bodyA: collider1, bodyB: collider2});
             }
+            
             return;
         }
 

@@ -172,7 +172,7 @@ export function performRotateEffect(rectangle: PIXI.Graphics, ticker: PIXI.Ticke
 
       // 효과가 끝나면 채우기 색상을 다시 검정색으로 변경
       rectangle.clear();
-      rectangle.beginFill(0x000000);
+      rectangle.beginFill(0x00c000, 0);
       rectangle.drawRect(0, 0, 50, 400);
       rectangle.endFill();
     }
@@ -191,7 +191,7 @@ export function performRotateEffect(rectangle: PIXI.Graphics, ticker: PIXI.Ticke
     firstRectangle.endFill();
   
     secondRectangle.clear();
-    secondRectangle.beginFill(0x000000);
+    secondRectangle.beginFill(0x000000, 0);
     secondRectangle.drawRect(0, 0, 50, 400);
     secondRectangle.endFill();
   }

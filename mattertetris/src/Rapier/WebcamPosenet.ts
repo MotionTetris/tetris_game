@@ -172,7 +172,7 @@ export async function runPosenet(videoRef: RefObject<HTMLVideoElement>, canvasRe
           ) {
             console.log("왼회전")
             //console.log("is", game.graphics.rectangles[2]);
-            performRotateEffect(game.graphics.rectangles[3], game.graphics.ticker, 0xff0000);
+            performRotateEffect(game.graphics.rectangles[2], game.graphics.ticker, 0xff00c0);
             let rotation = game.fallingTetromino?.rigidBody.rotation();
             //game.fallingTetromino?.rigidBody.setRotation(rotation + 90/180 * Math.PI, false);
             game.fallingTetromino?.rigidBody.applyTorqueImpulse(1000000, false);
@@ -190,7 +190,7 @@ export async function runPosenet(videoRef: RefObject<HTMLVideoElement>, canvasRe
             rightWristX - 20 > prevRightWristX
           ) {
             console.log("우회전")
-            performRotateEffect(game.graphics.rectangles[2], game.graphics.ticker, 0xff0000);
+            performRotateEffect(game.graphics.rectangles[3], game.graphics.ticker, 0xff00c0);
             let rotation = game.fallingTetromino?.rigidBody.rotation();
             game.fallingTetromino?.rigidBody.applyTorqueImpulse(-1000000, false);
             //game.fallingTetromino?.rigidBody.setRotation(rotation + -90/180 * Math.PI, false);

@@ -7,6 +7,8 @@ export class LinearAlgebra {
             y += coords[i + 1];
         }
 
+        x /= coords.length / 2;
+        y /= coords.length / 2;
         return [x, y]
     }
 
