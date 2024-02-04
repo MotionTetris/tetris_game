@@ -5,6 +5,7 @@ import { BlockType, Tetromino } from "./Tetromino";
 import { createLines } from "./Line";
 import { calculateLineIntersectionArea } from "./BlockScore";
 import { removeLines } from "./BlockRemove";
+import { collisionParticleEffect, generateParticleTexture } from "./Effect";
 
 type RAPIER_API = typeof import("@dimforge/rapier2d");
 
@@ -99,16 +100,28 @@ export class TetrisGame {
         this.world.step(this.events);
         this.stepId += 1;
         this.graphics.render(this.world, false);
-        this.events.drainCollisionEvents(() => {
+        
+        this.events.drainCollisionEvents((handle1, handle2, started) => {
             console.log("충돌!");
+
+            // handle1과 handle2를 이용하여 Collider 객체 찾기
+            let collider1 = this.world.getCollider(handle1);
+            let collider2 = this.world.getCollider(handle2);
+            console.log(collider1.translation().x, collider1.translation().y);
+            // 두 콜라이더의 위치를 평균내어 충돌 위치를 계산
+            let collisionX = (collider1.translation().x + collider2.translation().x) / 2;
+            let collisionY = (collider1.translation().y + collider2.translation().y) / 2;
+
+            collisionParticleEffect(collisionX, -collisionY, this.graphics.viewport, this.graphics.renderer);
         });
         
-        if (this.stepId % 100 == 0) {
+        if (this.stepId % 200 == 0) {
             this.spawnBlock(0, "T", true);
+            
         }
 
         if (this.stepId % 1000 == 0) {
-            this.checkAndRemoveLines(3000);
+            //this.checkAndRemoveLines(3000);
         }
         requestAnimationFrame(() => this.run());
     }

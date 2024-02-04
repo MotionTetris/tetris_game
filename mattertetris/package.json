@@ -24,6 +24,7 @@
     "react-dom": "^18.2.0",
     "resurrect-js": "^1.0.1",
     "socket.io-client": "^4.7.4",
+    "styled-components": "^6.1.8",
     "vite-plugin-top-level-await": "^1.4.1",
     "vite-plugin-wasm": "^3.3.0"
   },

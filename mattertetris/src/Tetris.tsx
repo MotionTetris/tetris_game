@@ -5,6 +5,9 @@ import { calculatePosition, removeLines } from "./Rapier/BlockRemove.ts";
 import { Tetromino } from "./Rapier/Tetromino.ts";
 import { calculateLineIntersectionArea } from "./Rapier/BlockScore.ts";
 import { createLines } from "./Rapier/Line.ts";
+import { Container, SceneCanvas, EffectCanvas } from "./style.tsx";
+import { createLineEffect } from "./Rapier/Effect.ts";
+import * as PIXI from "pixi.js";
 
 let playerScore = 0;
 const RAPIER = await import('@dimforge/rapier2d')
@@ -12,6 +15,7 @@ const Tetris: React.FC = () => {
   const sceneRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
+
     if (!!!sceneRef.current) {
       console.log("sceneRef is null");
       return;
@@ -59,27 +63,10 @@ const Tetris: React.FC = () => {
   return () => {}}, []);
 
   return (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        height: "100vh",
-        overflow: "hidden",
-      }}
-    >
-      <canvas
-        id="game"
-        ref={sceneRef}
-        style={{
-          width: "600px",
-          height: "800px",
-          marginRight: "150px",
-          position: "relative",
-        }}
-      >
-    </canvas>
-    </div>
+    <Container>
+      <SceneCanvas id = "game" ref = {sceneRef}> </SceneCanvas>
+    </Container>
+
   );
 };
 

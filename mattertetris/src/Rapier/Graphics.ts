@@ -1,6 +1,7 @@
 import * as PIXI from "pixi.js";
 import {Viewport} from "pixi-viewport";
 import type * as RAPIER from "@dimforge/rapier2d";
+import { createLineEffect, generateParticleTexture } from "./Effect";
 
 type RAPIER_API = typeof import("@dimforge/rapier2d");
 
@@ -27,12 +28,15 @@ export class Graphics {
         this.colorIndex = 0;
         this.colorPalette = [0xf3d9b1, 0x98c1d9, 0x053c5e, 0x1f7a8c];
         this.renderer = new PIXI.Renderer({
-            backgroundColor: 0x292929,
+            backgroundColor: 0x222929,
             antialias: true,
             // resolution: pixelRatio,
             width: canvas.width,
             height: canvas.height,
         });
+
+
+        
 
         this.scene = new PIXI.Container();
         document.body.appendChild(this.renderer.view);
@@ -44,9 +48,18 @@ export class Graphics {
             worldHeight: canvas.height,
             interaction: this.renderer.plugins.interaction,
         });
+        
 
         this.scene.addChild(this.viewport);
         this.viewport.drag().pinch().wheel().decelerate();
+
+        //make line
+        let lines: PIXI.Graphics[] = [];
+        for (let i = 0 ; i < 20; i ++) {
+            createLineEffect(i, this.viewport, lines);
+        }
+
+        //const collisionTexture = generateParticleTexture(this.viewport);
 
         let me = this;
 
