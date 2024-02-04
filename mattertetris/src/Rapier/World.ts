@@ -36,7 +36,7 @@ function createWall(canvasWidth: number, canvasHeight: number, width: number, he
     }   
 
     const left_wall = {
-        x: canvasWidth / 2 - width / 2 * blockSize - wall_thick / 2,
+        x: canvasWidth / 2 - width / 2 * blockSize - wall_thick / 2 - 50,
         y: 0,
         hx: wall_thick, 
         hy: canvasHeight,
@@ -44,7 +44,7 @@ function createWall(canvasWidth: number, canvasHeight: number, width: number, he
     }
 
     const right_wall = {
-        x: canvasWidth / 2 + width / 2 * blockSize + wall_thick, 
+        x: canvasWidth / 2 + width / 2 * blockSize + wall_thick + 50, 
         y: 0,
         hx: wall_thick,
         hy: canvasHeight,

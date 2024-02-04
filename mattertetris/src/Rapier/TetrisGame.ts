@@ -5,6 +5,7 @@ import { BlockType, Tetromino } from "./Tetromino";
 import { createLines } from "./Line";
 import { calculateLineIntersectionArea } from "./BlockScore";
 import { removeLines } from "./BlockRemove";
+import { collisionParticleEffect, generateParticleTexture } from "./Effect";
 import { KeyFrameEvent, MultiPlayerContext } from "./Multiplay";
 
 type RAPIER_API = typeof import("@dimforge/rapier2d");
@@ -142,9 +143,16 @@ export class TetrisGame {
 
             const body1 = this.world.getCollider(handle1);
             const body2 = this.world.getCollider(handle2);
+            console.log(collider1.translation().x, collider1.translation().y);
+            // 두 콜라이더의 위치를 평균내어 충돌 위치를 계산
+            let collisionX = (collider1.translation().x + collider2.translation().x) / 2;
+            let collisionY = (collider1.translation().y + collider2.translation().y) / 2;
+
+            collisionParticleEffect(collisionX, -collisionY, this.graphics.viewport, this.graphics.renderer);
             this.onCollisionDetected(body1, body2);
         });
         
+
         requestAnimationFrame(() => this.run());
     }
 

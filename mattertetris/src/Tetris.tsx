@@ -1,13 +1,26 @@
 import React, { useEffect, useRef, useState } from "react";
 import { TetrisGame } from "./Rapier/TetrisGame.ts";
 import { initWorld } from "./Rapier/World.ts";
+import { calculatePosition, removeLines } from "./Rapier/BlockRemove.ts";
+import { Tetromino } from "./Rapier/Tetromino.ts";
+import { calculateLineIntersectionArea } from "./Rapier/BlockScore.ts";
+import { createLines } from "./Rapier/Line.ts";
+import { Container, SceneCanvas, EffectCanvas, VideoContainer, Video, VideoCanvas } from "./style.tsx";
+import { createLineEffect } from "./Rapier/Effect.ts";
+import * as PIXI from "pixi.js";
+import { runPosenet } from "./Rapier/WebcamPosenet.ts";
+import "@tensorflow/tfjs";
+
 
 let playerScore = 0;
 const RAPIER = await import('@dimforge/rapier2d')
 const Tetris: React.FC = () => {
-  const sceneRef = useRef<HTMLCanvasElement>(null);
+  const sceneRef = useRef<HTMLCanvasElement>(null);  //게임화면
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
+
     if (!!!sceneRef.current) {
       console.log("sceneRef is null");
       return;
@@ -45,7 +58,8 @@ const Tetris: React.FC = () => {
       blockCollisionCallback: CollisionEvent,
       blockLandingCallback: LandingEvent
     }));
-
+    game.graphics.ticker.start();
+    runPosenet(videoRef, canvasRef, game);
     game.run();
     game.spawnBlock(0xFF0000, "I", true);
     // setInterval(() => {
@@ -65,27 +79,14 @@ const Tetris: React.FC = () => {
   return () => {}}, []);
 
   return (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        height: "100vh",
-        overflow: "hidden",
-      }}
-    >
-      <canvas
-        id="game"
-        ref={sceneRef}
-        style={{
-          width: "600px",
-          height: "800px",
-          marginRight: "150px",
-          position: "relative",
-        }}
-      >
-    </canvas>
-    </div>
+    <Container>
+      <SceneCanvas id = "game" ref = {sceneRef}> </SceneCanvas>
+      <VideoContainer>
+        <Video ref={videoRef} autoPlay/>
+        <VideoCanvas ref={canvasRef}/>
+      </VideoContainer>
+    </Container>
+
   );
 };
 
