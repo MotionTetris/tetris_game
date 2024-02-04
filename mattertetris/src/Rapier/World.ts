@@ -11,7 +11,7 @@ export function initWorld(RAPIER: RAPIER_API, option: TetrisOption) {
         let bodyDesc = RAPIER.RigidBodyDesc
                              .fixed()
                              .setTranslation(ground.x,ground.y)
-                             .setUserData({label: ground.label});
+                             .setUserData({type: ground.label});
                                            
         let body = world.createRigidBody(bodyDesc);
 

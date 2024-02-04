@@ -153,6 +153,7 @@ export class Graphics {
         RAPIER: RAPIER_API,
         world: RAPIER.World,
         collider: RAPIER.Collider,
+        color?: number
     ) {
         let i;
         let parent = collider.parent();

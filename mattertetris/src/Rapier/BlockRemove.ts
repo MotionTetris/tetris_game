@@ -6,7 +6,7 @@ import { LinearAlgebra } from "./LinearAlgebra";
 import { BlockCreator } from "./BlockCreator";
 import { calculateArea } from "./BlockScore";
 
-export function removeLines(world: RAPIER.World, body: RAPIER.RigidBody, line: Geometry) {
+export function removeLines(body: RAPIER.RigidBody, line: Geometry) {
     const diffResults: Float32Array[] = [];
 
     for (let i = 0; i < body.numColliders(); i++) {
