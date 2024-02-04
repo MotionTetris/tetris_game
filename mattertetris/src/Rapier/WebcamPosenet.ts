@@ -2,6 +2,9 @@ import { RefObject } from 'react';
 import * as posenet from "@tensorflow-models/posenet";
 import * as PIXI from "pixi.js";
 import { performPushEffect, performRotateEffect } from './Effect';
+import { TetrisGame } from './TetrisGame';
+import { Graphics } from './Graphics';
+
 
 
 // webcam.ts
@@ -24,7 +27,8 @@ export async function setupWebcam(videoRef: RefObject<HTMLVideoElement>) {
     return video;
 }
 
-export async function runPosenet(videoRef: RefObject<HTMLVideoElement>, canvasRef: RefObject<HTMLCanvasElement>) {
+export async function runPosenet(videoRef: RefObject<HTMLVideoElement>, canvasRef: RefObject<HTMLCanvasElement>,
+    game: TetrisGame) {
     const net = await posenet.load();
     const video = await setupWebcam(videoRef);
     const canvas = canvasRef.current;
@@ -51,14 +55,12 @@ export async function runPosenet(videoRef: RefObject<HTMLVideoElement>, canvasRe
     //const [rectangleLeft, rectangleRight, rectangleLeftRotate, rectangleRightRotate] = rectangles;
 
     setInterval(async () => {
-
-      
       const pose = await net.estimateSinglePose(video, {
         flipHorizontal: true,
       });
-      console.log("여기는 오는데..");
+    
       if (ctx && canvas) {
-        console.log("여긴들어오나요?")
+        
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         pose.keypoints.forEach((keypoint) => {
@@ -161,31 +163,35 @@ export async function runPosenet(videoRef: RefObject<HTMLVideoElement>, canvasRe
           rightAngleDelta = rightAngleInDegrees - prevRightAngle;
         }
 
-        // if (leftAngleDelta > rightAngleDelta) {
-        //   if (
-        //     leftAngleDelta > 35 &&
-        //     leftAngleInDegrees > prevLeftAngle &&
-        //     leftWristX < prevLeftWristX - 20
-        //   ) {
-        //     if (GAME.fallingBlock) {
-        //       // block이 존재하는지 확인
-        //       Body.rotate(GAME.fallingBlock, -Math.PI / 4); // 45도 회전
-        //       performRotateEffect(rectangleLeftRotate, app, 0xff0000);
-        //     }
-        //   }
-        // } else {
-        //   if (
-        //     rightAngleDelta > 35 &&
-        //     rightAngleInDegrees > prevRightAngle &&
-        //     rightWristX - 20 > prevRightWristX
-        //   ) {
-        //     if (GAME.fallingBlock) {
-        //       // block이 존재하는지 확인
-        //       Body.rotate(GAME.fallingBlock, Math.PI / 4); // 45도 회전
-        //       performRotateEffect(rectangleRightRotate, app, 0xff0000);
-        //     }
-        //   }
-        // }
+        if (leftAngleDelta > rightAngleDelta) {
+          if (
+            leftAngleDelta > 35 &&
+            leftAngleInDegrees > prevLeftAngle &&
+            leftWristX < prevLeftWristX - 20
+          ) {
+            console.log("왼회전")
+            performRotateEffect(game.graphics.rectangles[2], game.graphics.ticker, 0xff0000);
+            //if (GAME.fallingBlock) {
+              // block이 존재하는지 확인
+            //Body.rotate(GAME.fallingBlock, -Math.PI / 4); // 45도 회전
+            //performRotateEffect(rectangleLeftRotate, app, 0xff0000);
+            //}
+          }
+        } else {
+          if (
+            rightAngleDelta > 35 &&
+            rightAngleInDegrees > prevRightAngle &&
+            rightWristX - 20 > prevRightWristX
+          ) {
+            console.log("우회전")
+            performRotateEffect(game.graphics.rectangles[3], game.graphics.ticker, 0xff0000);
+            // if (GAME.fallingBlock) {
+            //   // block이 존재하는지 확인
+            //   Body.rotate(GAME.fallingBlock, Math.PI / 4); // 45도 회전
+            //   performRotateEffect(rectangleRightRotate, app, 0xff0000);
+            // }
+          }
+        }
 
         let noseKeypoint = pose.keypoints.find(
           (keypoint) => keypoint.part === "nose"
@@ -198,31 +204,31 @@ export async function runPosenet(videoRef: RefObject<HTMLVideoElement>, canvasRe
           ? videoRef.current.offsetWidth / 2
           : null;
 
-        // if (noseX && centerX) {
-        //   let forceMagnitude = Math.abs(noseX - centerX) / (centerX * 100); // 중앙에서 얼마나 떨어져 있는지에 비례하는 힘의 크기를 계산합니다.
-        //   forceMagnitude = Math.min(forceMagnitude, 1); // 힘의 크기가 너무 커지지 않도록 1로 제한합니다.
+        if (noseX && centerX) {
+          let forceMagnitude = Math.abs(noseX - centerX) / (centerX * 100); // 중앙에서 얼마나 떨어져 있는지에 비례하는 힘의 크기를 계산합니다.
+          forceMagnitude = Math.min(forceMagnitude, 1); // 힘의 크기가 너무 커지지 않도록 1로 제한합니다.
 
-        //   // noseX와 centerX의 차이에 따라 alpha 값을 결정
-        //   let alpha = Math.min(Math.abs(noseX - centerX) / 300, 1); // 100은 정규화를 위한 값이며 조절 가능
+          // noseX와 centerX의 차이에 따라 alpha 값을 결정
+          let alpha = Math.min(Math.abs(noseX - centerX) / 300, 1); // 100은 정규화를 위한 값이며 조절 가능
 
         //   if (GAME.fallingBlock) {
-        //     if (noseX < centerX) {
-        //       // 코의 x 좌표가 캔버스 중앙보다 왼쪽에 있다면, 블록에 왼쪽으로 힘을 가합니다.
-        //       Body.applyForce(GAME.fallingBlock, GAME.fallingBlock.position, {
-        //         x: -forceMagnitude,
-        //         y: 0,
-        //       });
-        //       performPushEffect(rectangleLeft, rectangleRight,  alpha, 0x00ff00);
-        //     } else {
-        //       // 코의 x 좌표가 캔버스 중앙보다 오른쪽에 있다면, 블록에 오른쪽으로 힘을 가합니다.
-        //       Body.applyForce(GAME.fallingBlock, GAME.fallingBlock.position, {
-        //         x: forceMagnitude,
-        //         y: 0,
-        //       });
-        //       performPushEffect(rectangleRight, rectangleLeft, alpha, 0x00ff00);
-        //     }
-        //   }
-        // }
+            if (noseX < centerX) {
+              // 코의 x 좌표가 캔버스 중앙보다 왼쪽에 있다면, 블록에 왼쪽으로 힘을 가합니다.
+            //   Body.applyForce(GAME.fallingBlock, GAME.fallingBlock.position, {
+            //     x: -forceMagnitude,
+            //     y: 0,
+            //   });
+              performPushEffect(game.graphics.rectangles[0], game.graphics.rectangles[1],  alpha, 0x00ff00);
+            } else {
+              // 코의 x 좌표가 캔버스 중앙보다 오른쪽에 있다면, 블록에 오른쪽으로 힘을 가합니다.
+            //   Body.applyForce(GAME.fallingBlock, GAME.fallingBlock.position, {
+            //     x: forceMagnitude,
+            //     y: 0,
+            //   });
+              performPushEffect(game.graphics.rectangles[1], game.graphics.rectangles[2], alpha, 0x00ff00);
+            }
+          //}
+        }
 
         prevLeftAngle = leftAngleInDegrees;
         prevRightAngle = rightAngleInDegrees;

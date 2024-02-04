@@ -1,7 +1,7 @@
 import * as PIXI from "pixi.js";
 import {Viewport} from "pixi-viewport";
 import type * as RAPIER from "@dimforge/rapier2d";
-import { createLineEffect, generateParticleTexture } from "./Effect";
+import { createLineEffect, createRectangle} from "./Effect";
 
 type RAPIER_API = typeof import("@dimforge/rapier2d");
 
@@ -15,11 +15,12 @@ export class Graphics {
     colorIndex: number;
     colorPalette: Array<number>;
     renderer: PIXI.Renderer;
-    scene: PIXI.Container;
+    scene: PIXI.Container; //자식 컨테이너1
     viewport: Viewport;
     instanceGroups: Array<Array<PIXI.Graphics>>;
     lines: PIXI.Graphics;
-
+    rectangles: Array<PIXI.Graphics>;
+    ticker: PIXI.Ticker;
     constructor(canvas: HTMLCanvasElement) {
         // High pixel Ratio make the rendering extremely slow, so we cap it.
         // const pixelRatio = window.devicePixelRatio ? Math.min(window.devicePixelRatio, 1.5) : 1;
@@ -35,10 +36,9 @@ export class Graphics {
             height: canvas.height,
         });
 
-
+        this.scene = new PIXI.Container();
         
 
-        this.scene = new PIXI.Container();
         document.body.appendChild(this.renderer.view);
 
         this.viewport = new Viewport({
@@ -48,18 +48,21 @@ export class Graphics {
             worldHeight: canvas.height,
             interaction: this.renderer.plugins.interaction,
         });
-        
-
+      
         this.scene.addChild(this.viewport);
+     
         this.viewport.drag().pinch().wheel().decelerate();
-
-        //make line
-        let lines: PIXI.Graphics[] = [];
+        this.rectangles = [];
+        this.rectangles.push(createRectangle(this.scene, 50, 350, 10, 0));
+        this.rectangles.push(createRectangle(this.scene, 50, 350, 550, 0));
+        this.rectangles.push(createRectangle(this.scene, 50, 350, 10, 370));
+        this.rectangles.push(createRectangle(this.scene, 50, 350, 550, 370));
+        this.ticker = new PIXI.Ticker();
+        //make lineGrids
+        let lineGrids: PIXI.Graphics[] = [];
         for (let i = 0 ; i < 20; i ++) {
-            createLineEffect(i, this.viewport, lines);
+            createLineEffect(i, this.viewport, lineGrids);
         }
-
-        //const collisionTexture = generateParticleTexture(this.viewport);
 
         let me = this;
 
@@ -131,7 +134,9 @@ export class Graphics {
         }
 
         this.updatePositions(world);
+        
         this.renderer.render(this.scene);
+        
     }
 
     lookAt(pos: {zoom: number; target: {x: number; y: number}}) {

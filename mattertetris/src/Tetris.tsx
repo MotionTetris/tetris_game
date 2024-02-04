@@ -51,7 +51,8 @@ const Tetris: React.FC = () => {
       spawnX: sceneRef.current.width / 2,
       blockCollisionCallback: event
     }));
-    runPosenet(videoRef, canvasRef);
+    game.graphics.ticker.start();
+    runPosenet(videoRef, canvasRef, game);
     game.run();
 
     // setInterval(() => {

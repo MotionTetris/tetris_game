@@ -84,7 +84,7 @@ export function collisionParticleEffect(
     viewport: Viewport,
     renderer: PIXI.Renderer
   ): void {
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 10; i++) {
   
         const particle = generateParticleTexture(renderer);
   
@@ -134,54 +134,54 @@ export function collisionParticleEffect(
   
 
 
-export function createRectangle(app: PIXI.Application, width: number, height: number, x: number, y: number) {
+export function createRectangle(container: PIXI.Container, width: number, height: number, x: number, y: number) {
     const rectangle = new PIXI.Graphics();
-    rectangle.beginFill(0x000000);
+    rectangle.beginFill(0x0000c0);
     rectangle.drawRect(0, 0, width, height);
     rectangle.endFill();
     rectangle.x = x;
     rectangle.y = y;
-    app.stage.addChild(rectangle);
+    container.addChild(rectangle);
     return rectangle;
 }
 
 
-export function performRotateEffect(rectangle: PIXI.Graphics, app: PIXI.Application, color: number) {
-    rectangle.clear();
-    rectangle.beginFill(color);
-    rectangle.drawRect(0, 0, 50, 400);
-    rectangle.endFill();
-  
-    let direction = 1;
-    const effectDuration = 0.5; // 효과 지속 시간(초)
-    const startTime = Date.now(); // 시작 시간
-  
-    const animate = () => {
-      rectangle.alpha += 0.01 * direction;
-      if (rectangle.alpha > 1) {
-        rectangle.alpha = 1;
-        direction = -1;
-      } else if (rectangle.alpha < 0) {
-        rectangle.alpha = 0;
-        direction = 1;
-      }
-  
-      // 효과 지속 시간이 지나면 ticker에서 콜백 함수를 제거
-      if ((Date.now() - startTime) / 1000 > effectDuration) {
-        app.ticker.remove(animate);
-  
-        // 효과가 끝나면 채우기 색상을 다시 검정색으로 변경
-        rectangle.clear();
-        rectangle.beginFill(0x000000);
-        rectangle.drawRect(0, 0, 50, 400);
-        rectangle.endFill();
-      }
-    };
-  
-    // 티커에 애니메이션 함수 추가
-    app.ticker.add(animate);
-  }
-  
+export function performRotateEffect(rectangle: PIXI.Graphics, ticker: PIXI.Ticker, color: number) {
+  rectangle.clear();
+  rectangle.beginFill(color);
+  rectangle.drawRect(0, 0, 50, 400);
+  rectangle.endFill();
+
+  let direction = 1;
+  const effectDuration = 0.5; // 효과 지속 시간(초)
+  const startTime = Date.now(); // 시작 시간
+
+  const animate = () => {
+    rectangle.alpha += 0.01 * direction;
+    if (rectangle.alpha > 1) {
+      rectangle.alpha = 1;
+      direction = -1;
+    } else if (rectangle.alpha < 0) {
+      rectangle.alpha = 0;
+      direction = 1;
+    }
+
+    // 효과 지속 시간이 지나면 ticker에서 콜백 함수를 제거
+    if ((Date.now() - startTime) / 1000 > effectDuration) {
+      ticker.remove(animate);  // 수정된 부분
+
+      // 효과가 끝나면 채우기 색상을 다시 검정색으로 변경
+      rectangle.clear();
+      rectangle.beginFill(0x000000);
+      rectangle.drawRect(0, 0, 50, 400);
+      rectangle.endFill();
+    }
+  };
+
+  // 티커에 애니메이션 함수 추가
+  ticker.add(animate);  // 수정된 부분
+}
+
   
   export function performPushEffect(firstRectangle: PIXI.Graphics, secondRectangle: PIXI.Graphics, alpha: number, color: number) {
     firstRectangle.alpha = alpha;
