@@ -5,14 +5,19 @@ import { calculatePosition, removeLines } from "./Rapier/BlockRemove.ts";
 import { Tetromino } from "./Rapier/Tetromino.ts";
 import { calculateLineIntersectionArea } from "./Rapier/BlockScore.ts";
 import { createLines } from "./Rapier/Line.ts";
-import { Container, SceneCanvas, EffectCanvas } from "./style.tsx";
+import { Container, SceneCanvas, EffectCanvas, VideoContainer, Video, VideoCanvas } from "./style.tsx";
 import { createLineEffect } from "./Rapier/Effect.ts";
 import * as PIXI from "pixi.js";
+import { runPosenet } from "./Rapier/WebcamPosenet.ts";
+import "@tensorflow/tfjs";
+
 
 let playerScore = 0;
 const RAPIER = await import('@dimforge/rapier2d')
 const Tetris: React.FC = () => {
-  const sceneRef = useRef<HTMLCanvasElement>(null);
+  const sceneRef = useRef<HTMLCanvasElement>(null);  //게임화면
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
 
@@ -46,7 +51,7 @@ const Tetris: React.FC = () => {
       spawnX: sceneRef.current.width / 2,
       blockCollisionCallback: event
     }));
-
+    runPosenet(videoRef, canvasRef);
     game.run();
 
     // setInterval(() => {
@@ -65,6 +70,10 @@ const Tetris: React.FC = () => {
   return (
     <Container>
       <SceneCanvas id = "game" ref = {sceneRef}> </SceneCanvas>
+      <VideoContainer>
+        <Video ref={videoRef} autoPlay/>
+        <VideoCanvas ref={canvasRef}/>
+      </VideoContainer>
     </Container>
 
   );
