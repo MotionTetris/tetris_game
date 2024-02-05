@@ -66,6 +66,7 @@ export class Tetromino {
             this._context.removeChild(value);
         });
 
-        this._world.removeRigidBody(this._rigidBody);
+        // TODO: At some point, we will have to delete a block.
+        this._rigidBody.setTranslation({x: 10000, y: 0}, false);
     }
 }
