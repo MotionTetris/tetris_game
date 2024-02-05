@@ -30,7 +30,7 @@ export class BlockCreator {
             coords[i] -= center[0];
             coords[i + 1] -= center[1];
         }
-        console.log(`collide center= ${x} ${y}`);
+        
         return RAPIER.ColliderDesc.convexHull(new Float32Array(coords))?.setTranslation(x, y);
     }
 

@@ -8,7 +8,7 @@ export const Container = styled.div`
     overflow: hidden;
 `;
 
-export const SceneCanvas = styled.div`
+export const SceneCanvas = styled.canvas`
     width: 600px;
     height: 800px;
     left: 200px;
