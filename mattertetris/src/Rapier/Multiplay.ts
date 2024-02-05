@@ -5,7 +5,8 @@ export class KeyFrameEvent {
     event: PlayerEventType;
     keyframe: number;
     sequence: number;
-
+    userData: any;
+    
     public constructor(userId: string, event: PlayerEventType, keyframe: number, sequence: number) {
         this.userId = userId;
         this.event = event;
@@ -13,7 +14,7 @@ export class KeyFrameEvent {
         this.sequence = sequence;
     }
 
-    public fromGame(game: TetrisGame, userId: string, event: PlayerEventType) {
+    public static fromGame(game: TetrisGame, userId: string, event: PlayerEventType) {
         return new KeyFrameEvent(userId, event, game.stepId, game.sequence);
     }
 }
@@ -22,7 +23,7 @@ export enum PlayerEventType {
     MOVE_LEFT = 0,
     MOVE_RIGHT = 1,
     TURN_LEFT = 2,
-    TRUN_RIGHT = 3
+    TURN_RIGHT = 3
 }
 
 export class MultiPlayerContext {
@@ -37,7 +38,7 @@ export class MultiPlayerContext {
     }
 
     public isEventValid(event: KeyFrameEvent) {
-        if (this.lastSequence !== event.sequence - 1) {
+        if (this.lastSequence !== event.sequence) {
             return false; 
         }
 

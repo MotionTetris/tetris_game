@@ -10,6 +10,5 @@ export function createLines(startY: number, endY: number, thickness: number, x: 
     for (let i = startY; i < endY + thickness; i += thickness) {
         lines.push([[[x, i], [x, i + thickness], [-x, i + thickness], [-x, i], [x, i]]]);
     }
-    console.log(lines);
     return lines;
 }

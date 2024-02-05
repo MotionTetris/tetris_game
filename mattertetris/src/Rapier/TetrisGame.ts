@@ -1,12 +1,12 @@
 import {Graphics} from "./Graphics";
 import * as RAPIER from "@dimforge/rapier2d";
-import { TetrisOption } from "./TetrisOption";
+import { BlockCollisionCallbackParam, TetrisOption } from "./TetrisOption";
 import { BlockType, Tetromino } from "./Tetromino";
 import { createLines } from "./Line";
 import { calculateLineIntersectionArea } from "./BlockScore";
 import { removeLines as removeShapeWithLine } from "./BlockRemove";
 import { collisionParticleEffect, explodeParticleEffect, generateParticleTexture } from "./Effect";
-import { KeyFrameEvent, MultiPlayerContext } from "./Multiplay";
+import { KeyFrameEvent, MultiPlayerContext, PlayerEventType } from "./Multiplay";
 import { BlockColorList } from "../Tetris/BlockCreator";
 import { valueAndGrad } from "@tensorflow/tfjs";
 
@@ -28,10 +28,11 @@ export class TetrisGame {
     fallingTetromino?: Tetromino;
     lines: number[][][][];
     sequence: number;
+    userId: string;
     multiPlayerContext?: MultiPlayerContext;
     running: boolean;
-
-    constructor(option: TetrisOption, multiplay: boolean, userId?: string) {
+    receivedKeyFrameEvent: Array<KeyFrameEvent>;
+    constructor(option: TetrisOption, multiplay: boolean, userId: string) {
         if (!option.view) {
             throw new Error("Canvas is null");
         }
@@ -45,13 +46,16 @@ export class TetrisGame {
         this.lines = createLines(-20 * option.blockSize + 20, 0, option.blockSize);
         this.sequence = 0;
         this.running = false;
-
+        this.userId = userId;
+        this.receivedKeyFrameEvent = [];
         if (multiplay) {
-            if (!userId) {
-                throw new Error("Set to multiplayer view, but no userId is given.");
-            }
             this.multiPlayerContext = new MultiPlayerContext(userId);
+            console.log("멀티플레이 시작.");
         }
+    }
+
+    public set landingCallback(callback: ((result: BlockCollisionCallbackParam) => void)) {
+        this.option.blockLandingCallback = callback;
     }
 
     setpreTimestepAction(action: (gfx: Graphics) => void) {
@@ -70,7 +74,7 @@ export class TetrisGame {
         world.forEachCollider((coll) => {
             this.graphics.addCollider(RAPIER, world, coll);
         });
-        console.log(world);
+
         this.lastMessageTime = new Date().getTime();
     }
 
@@ -114,34 +118,62 @@ export class TetrisGame {
             return;
         }
 
-        if (!this.multiPlayerContext.isEventValid(event)) {
-            throw new Error("Failed to receive event: Invalid event");
-        }
+        // if (!this.multiPlayerContext.isEventValid(event)) {
+        //     throw new Error("Failed to receive event: Invalid event");
+        // }
 
         this.multiPlayerContext.updateNewEvent(event);
-
+        this.receivedKeyFrameEvent.push(event);
         if (!this.running) {
             this.run();
         }
     }
 
     run() {
-        this.world.numSolverIterations = 4;
+        this.world.numSolverIterations = 10;
         if (this.multiPlayerContext) {
             if (this.stepId >= this.multiPlayerContext.lastKeyframe) {
                 this.running = false;
                 return;
+            } else {
+                this.running = true;
             }
-        }
-
-        if (!this.running) {
-            return;
+        } else {
+            if (!this.running) {
+                return;
+            }
         }
 
         if (!!this.preTimestepAction) {
             this.preTimestepAction(this.graphics);
         }
 
+        if (this.multiPlayerContext) {
+            if (this.receivedKeyFrameEvent.length !== 0 && this.receivedKeyFrameEvent[0].keyframe >= this.stepId) {
+                const event = this.receivedKeyFrameEvent.shift();
+                switch (event?.event) {
+                    case PlayerEventType.MOVE_LEFT:
+                        this.onMoveLeft(event?.userData);
+                        console.log("좌로이동");
+                        break;
+                    case PlayerEventType.MOVE_RIGHT:
+                        this.onMoveRight(event?.userData);
+                        console.log("우로이동")
+                        break;
+                    case PlayerEventType.TURN_LEFT:
+                        console.log("좌로돌림")
+                        this.onRotateLeft();
+                        break;
+                    case PlayerEventType.TURN_RIGHT:
+                        console.log("우로돌림")
+                        this.onRotateRight();
+                        break;
+                    default:
+                        console.log("이동X");
+                }
+            }
+        }
+        
         this.world.step(this.events);
         this.stepId += 1;
         this.graphics.render(this.world, false);
@@ -245,7 +277,6 @@ export class TetrisGame {
 
             let shape = new Tetromino(this.option, this.world, this.graphics.viewport, body, color);
             shapes.push(shape);
-            console.log(shape);
         }
 
         for (let shape of shapes) {
@@ -290,7 +321,6 @@ export class TetrisGame {
                 score += calculateLineIntersectionArea(value.rigidBody, this.lines[i]);
             });
 
-            console.log(`line[${i}] = ${score}`);
             if (score >= threshold) {
                 scoreSum += score;
                 lineToRemove.push(this.lines[i]);
@@ -327,6 +357,40 @@ export class TetrisGame {
         }
 
         return true;
+    }
+
+    onRotateLeft() {
+        this.fallingTetromino?.rigidBody.applyTorqueImpulse(1000000, false);
+        let event = KeyFrameEvent.fromGame(this, this.userId, PlayerEventType.TURN_LEFT);
+        console.log(event);
+        this.sequence += 1;
+        return event;
+    }
+
+    onRotateRight() {
+        this.fallingTetromino?.rigidBody.applyTorqueImpulse(-1000000, false);
+        let event =  KeyFrameEvent.fromGame(this, this.userId, PlayerEventType.TURN_RIGHT);
+        console.log(event);
+        this.sequence += 1;
+        return event;
+    }
+
+    onMoveLeft(weight: number) {
+        this.fallingTetromino?.rigidBody.applyImpulse({x: -weight * 100000, y: 0}, false);
+        let event = KeyFrameEvent.fromGame(this, this.userId, PlayerEventType.MOVE_LEFT);
+        event.userData = weight;
+        console.log(event);
+        this.sequence += 1;
+        return event;
+    }
+
+    onMoveRight(weight: number) {
+        this.fallingTetromino?.rigidBody.applyImpulse({x: weight * 100000, y: 0}, false);
+        let event = KeyFrameEvent.fromGame(this, this.userId, PlayerEventType.MOVE_RIGHT);
+        event.userData = weight;
+        console.log(event);
+        this.sequence += 1;
+        return event;
     }
 
     onCollisionDetected(collider1: RAPIER.Collider, collider2: RAPIER.Collider) {

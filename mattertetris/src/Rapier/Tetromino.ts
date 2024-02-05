@@ -20,7 +20,6 @@ export class Tetromino {
     public constructor(option: TetrisOption, world: RAPIER.World, ctx: PIXI.Container, rigidBody?: RAPIER.RigidBody, blockColor?: number, blockType?: BlockType) {
         const spawnX = option.spawnX ?? 0;
         const spawnY = option.spawnY ?? 0;
-        console.log(spawnX, spawnY);
         this._world = world;
         this._blockColor = blockColor!;
         this._type = blockType!;
