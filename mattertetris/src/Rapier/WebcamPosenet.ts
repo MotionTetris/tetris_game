@@ -1,11 +1,9 @@
 import { RefObject } from 'react';
 import * as posenet from "@tensorflow-models/posenet";
-import * as PIXI from "pixi.js";
 import { performPushEffect, performRotateEffect } from './Effect';
 import { TetrisGame } from './TetrisGame';
-import { Graphics } from './Graphics';
-import { math } from '@tensorflow/tfjs';
-import {Socket} from "socket.io-client"
+import { Socket } from "socket.io-client"
+import { TetrisMultiplay } from './TetrisMultiplay';
 
 
 // webcam.ts
@@ -29,7 +27,7 @@ export async function setupWebcam(videoRef: RefObject<HTMLVideoElement>) {
 }
 
 export async function runPosenet(videoRef: RefObject<HTMLVideoElement>, canvasRef: RefObject<HTMLCanvasElement>,
-    game: TetrisGame, otherGame: TetrisGame,socket:Socket) {
+    game: TetrisGame, otherGame: TetrisMultiplay, socket?:Socket) {
     const net = await posenet.load();
     const video = await setupWebcam(videoRef);
     const canvas = canvasRef.current;
@@ -174,7 +172,7 @@ export async function runPosenet(videoRef: RefObject<HTMLVideoElement>, canvasRe
             performRotateEffect(game.graphics.rectangles[2], game.graphics.ticker, 0xff00c0);
             const event = game.onRotateLeft();
             otherGame.receiveKeyFrameEvent(event);
-            socket.emit('eventOn',event)
+            // socket.emit('eventOn',event)
           }
         } else {
           if (
@@ -186,7 +184,7 @@ export async function runPosenet(videoRef: RefObject<HTMLVideoElement>, canvasRe
             performRotateEffect(game.graphics.rectangles[3], game.graphics.ticker, 0xff00c0);
             const event = game.onRotateRight();
             otherGame.receiveKeyFrameEvent(event);
-            socket.emit('eventOn',event)
+           // socket.emit('eventOn',event)
           }
         }
 
@@ -212,15 +210,13 @@ export async function runPosenet(videoRef: RefObject<HTMLVideoElement>, canvasRe
             const event = game.onMoveLeft(forceMagnitude);
             console.log('왼쪽');
             performPushEffect(game.graphics.rectangles[0], game.graphics.rectangles[1],  alpha, 0x00ff00);
-            console.log(event);
             otherGame.receiveKeyFrameEvent(event);
             //socket.emit('eventOn',event)
           } else {
             console.log('오른쪽');
             const event = game.onMoveRight(forceMagnitude);
-            otherGame.receiveKeyFrameEvent(event);
-            console.log(event);
             performPushEffect(game.graphics.rectangles[1], game.graphics.rectangles[2], alpha, 0x00ff00);
+            otherGame.receiveKeyFrameEvent(event);
             //socket.emit('eventOn',event)
           }
         }

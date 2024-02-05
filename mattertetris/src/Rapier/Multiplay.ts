@@ -23,7 +23,8 @@ export enum PlayerEventType {
     MOVE_LEFT = 0,
     MOVE_RIGHT = 1,
     TURN_LEFT = 2,
-    TURN_RIGHT = 3
+    TURN_RIGHT = 3,
+    BLOCK_SPAWNED = 4
 }
 
 export class MultiPlayerContext {
@@ -38,7 +39,7 @@ export class MultiPlayerContext {
     }
 
     public isEventValid(event: KeyFrameEvent) {
-        if (this.lastSequence !== event.sequence) {
+        if (this.lastSequence !== event.sequence - 1) {
             return false; 
         }
 
